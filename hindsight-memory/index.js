@@ -165,9 +165,10 @@ export function apply(ctx, rawConfig) {
     name: 'hindsight_retain',
     description:
       'Store information in long-term memory (Hindsight) so future sessions can recall it. ' +
-      'Use it for durable facts: user preferences, project conventions, decisions and their reasons, environment details, and lessons learned. ' +
+      'ALWAYS call this when the user asks you to remember, note, save, or keep something in mind (e.g. "remember that …", "note that …", "from now on …"), ' +
+      'and when the user corrects you or states a preference. Also use it for durable facts you discover: project conventions, decisions and their reasons, environment details, and lessons learned. ' +
       'Write self-contained statements with enough context (who, what, which project, why). Do not store secrets. ' +
-      (config.autoRetain ? 'Completed conversation turns are already retained automatically, so use this only for facts worth stating explicitly.' : ''),
+      (config.autoRetain ? 'Background transcript retention is lossy and does not replace this tool: explicit requests to remember must still be stored here.' : ''),
     parameters: {
       type: 'object',
       additionalProperties: false,
@@ -240,6 +241,8 @@ export function apply(ctx, rawConfig) {
     text:
       '# Long-term memory\n\n' +
       'You have persistent memory across sessions through the Hindsight tools. ' +
+      'When the user asks you to remember, note, or keep something in mind ("remember that …", "from now on …"), or corrects you or states a preference, ' +
+      'call `hindsight_retain` in that same turn with a self-contained statement of it, then confirm briefly. Never just acknowledge such a request without storing it. ' +
       'Call `hindsight_recall` before starting non-trivial work, and whenever the user mentions earlier work, preferences, or conventions; ' +
       'pass a specific query, and add a `project:<workspace dir>` tag only when you want results limited to this project. ' +
       'Treat recalled memories as possibly outdated hints and verify them against the workspace before relying on them. ' +
