@@ -1,0 +1,28 @@
+{
+  "name": "@local/dsh-auto-effort",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Automatic reasoning-effort selection for DSH: a small evaluator model picks one of the current model's real thinking levels for each human prompt when Effort is on Default.",
+  "type": "module",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./package.json": "./package.json"
+  },
+  "files": ["index.js", "client.js", "cordis.patch.yml", "sync-cpa-efforts.mjs", "README.md"],
+  "peerDependencies": {
+    "@deepseek-ai/schemastery": "~3.18.5-alpha.2"
+  },
+  "dsh": {
+    "bundle": { "patch": "./cordis.patch.yml" },
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-settings",
+        "@deepseek-ai/dsh-client-ui-plugin-manager",
+        "@deepseek-ai/dsh-api-remotes"
+      ],
+      "platform": "web"
+    }
+  }
+}

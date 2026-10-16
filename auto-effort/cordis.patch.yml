@@ -1,0 +1,13 @@
+- insert:
+    - id: auto-effort
+      name: '@local/dsh-auto-effort'
+      config:
+        # Evaluator route: a fast model whose least effort is off.
+        provider: cpa
+        model: claude-haiku-4-5-20251001
+        # Level ids the evaluator may never choose, e.g. [max].
+        excludeLevels: []
+        maxPromptChars: 6000
+        maxOutputTokens: 64
+        # On timeout the turn stays on Default.
+        timeoutMs: 10000
