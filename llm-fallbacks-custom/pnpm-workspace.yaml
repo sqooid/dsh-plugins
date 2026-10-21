@@ -1,0 +1,36 @@
+# pnpm 11+ reads all non-auth settings from pnpm-workspace.yaml (not .npmrc).
+# @deepseek-ai/* peers resolve from the npm registry via autoInstallPeers,
+# using the auth token in .npmrc. No local link farm.
+autoInstallPeers: true
+nodeLinker: hoisted
+
+# esbuild's postinstall is blocked by pnpm 10+/11 defaults unless approved;
+# tsdown/tsx depend on it, so approve the build script here.
+allowBuilds:
+  esbuild: true
+
+# Upstream packaging fix: the published dsh-client-ui-primitives manifest does
+# not declare @deepseek-ai/dsh-util-code-language, while its built lib/index.js
+# bare-imports it at runtime (markdown code highlighting; the source tree
+# declares it only as a devDependency). Patch the manifest so the vitest/dev
+# graph can resolve the import. Remove once the upstream published manifest
+# declares the dependency. The injected spec is the upstream `next` dist-tag: a
+# moving tag that selects the prerelease channel, not a compatibility promise,
+# so a re-resolution can land on a version other than the one the host's peer
+# line resolves. It is chosen over `*`/`latest`, which resolve to a stale tag
+# (itself a prerelease the line has left behind) rather than the live channel.
+packageExtensions:
+  '@deepseek-ai/dsh-client-ui-primitives':
+    dependencies:
+      '@deepseek-ai/dsh-util-code-language': next
+
+# Minimum-release-age exemptions. One scope pattern covers the whole private
+# @deepseek-ai/* family instead of enumerating each published release: the
+# family ships in the same prerelease wave this repo's peers resolve from, so
+# the 24h maturity window would otherwise block every fresh prerelease
+# (ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION) and every dsh upgrade would need an
+# append here. User-approved tradeoff: the maturity window deliberately does
+# not apply to this scope — a compromised @deepseek-ai publication reaches the
+# graph without the 24h delay.
+minimumReleaseAgeExclude:
+  - '@deepseek-ai/*'

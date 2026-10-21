@@ -1,0 +1,9 @@
+# The custom dsh-llm-fallbacks profile-bundle patch: one insert over the
+# profile's bundle stack. dsh-base carries llm-retry, so this listener composes
+# later and only switches after the same-model retry policy is exhausted.
+# User profile patches replace this row's whole config; restate any overrides.
+
+- insert:
+    - id: llm-fallbacks
+      name: '@local/dsh-llm-fallbacks-custom'
+      config: {}

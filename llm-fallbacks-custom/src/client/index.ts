@@ -1,0 +1,357 @@
+/**
+ * dsh-llm-fallbacks client half: registers the Fallbacks card into the
+ * Plugins page `plugins.bundle.config` keyed slot (key = bundle package name
+ * `dsh-llm-fallbacks`).
+ *
+ * Wiring (mirrors dsh-advisor):
+ * - Registers the `fallbacks` locale dictionaries (zh/en).
+ * - Constructs the card's own store over the connection: the fallbacks
+ *   config rides the plugin's gateway channel (`connection.rpc` →
+ *   `/api/fallbacks/get|set|reset`), while `settings/describe` (writable +
+ *   namespace directory), the provider/model catalog, and the switch-history
+ *   tail page ride the typed `ctx.remote` namespaces (`ConnectionHandle`
+ *   dropped `api`; see `fallbacks-store.ts`).
+ * - Registers the `plugins.bundle.config` card `key: 'dsh-llm-fallbacks'`
+ *   (bundle package name) with a business-only inject face
+ *   ({@link FallbacksSettingsController} + hooks.snapshot); the old
+ *   Settings-nav section registration stays removed.
+ * - Refreshes the store on pushed invalidations — the forwarded remote
+ *   events `settings/document-updated` (ns-filtered to the fallbacks
+ *   namespace; refetches the descriptor + recent-switch summary) and
+ *   `llm/adapters-updated` (refetches only the provider/model catalog), plus
+ *   the client `connection/reset` (refetches all three) — and follows the
+ *   current session (`sessions.list`) so the status block's recent-switch
+ *   summary tracks the session being viewed (spec §2.5 D-5). `sessions` is
+ *   an optional reflection read (S-g): a host without the session service
+ *   leaves the switches face in its empty ready state.
+ *
+ * @module dsh-llm-fallbacks/client
+ */
+
+import type { Context as ClientContext } from '@deepseek-ai/cordis'
+import type { ISessions, SessionListState } from '@deepseek-ai/dsh-api-session-controller/client'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
+import { bindSnapshotSelector } from './use-snapshot.ts'
+// Type-only: pulls the `ctx.locale` Context merge (LocaleService face).
+import type {} from '@deepseek-ai/dsh-client-locale/client'
+// Type-only: pulls the plugin-config card slot's SlotMap merge (the
+// 'plugins.bundle.config' entry — this half's registration target). Same empty
+// type-only import pattern as the old ui-settings one: it loads the module's
+// types (the ./client entry re-exports the slot-contract merge) without any
+// value import.
+import type {} from '@deepseek-ai/dsh-client-ui-plugin-manager/client'
+// Type-only: the settings domain's slot-contract merge (the
+// 'settings.general.item' entry — the General page status row's registration
+// target). Same empty type-only pattern; the ui-settings package is already
+// a type-only peer (`peerDependencies`) and a manifest inject entry.
+import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
+// Type-only: the conversation domain's Context merge (the `uiConversation`
+// service seat — the D1 Definition registry's home). Same empty
+// type-only pattern; the ui-conversation package is already a type-only peer
+// (`peerDependencies`) and a manifest inject entry.
+import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
+// Type-only: the chat target's slot-contract merge (the
+// 'conversation.chat.node' keyed entry — the transcript switch node's
+// registration target) + the `ChatNodeDataMap` key seat, both re-homed from
+// ui-conversation to ui-chat upstream. Same empty type-only pattern; the
+// ui-chat package joins the type-only peers with this registration.
+import type {} from '@deepseek-ai/dsh-client-ui-chat/client'
+// Type-only: the renderer host's Context merge (the `slots` service seat +
+// the `slots/changed` Events entry). Same empty type-only pattern; the
+// ui-renderer package joins the type-only peers with this registration.
+import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
+// Type-only: the gateway's Client half declares `ctx.remote` (the typed
+// Remote service) on the cordis Context face.
+import type {} from '@deepseek-ai/dsh-api-gateway/client'
+// Type-only: the forwarded-event allowlist seat (`TypertRemoteEventSelection`)
+// — the `$on` key projection the invalidation subscriptions subscribe through.
+import type {} from '@deepseek-ai/dsh-api-remotes/types'
+// Type-only: the settings seam's cordis `Events` entry
+// (`settings/document-updated` with the branded `SettingsNamespace`) and the
+// llm registry's (`llm/adapters-updated` payload-free) — same pattern as
+// dsh-client-ui-settings' settings-scope (types subpath, no value import).
+import type {} from '@deepseek-ai/dsh-settings/types'
+import type {} from '@deepseek-ai/dsh-llm/types'
+import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
+import { FallbacksCard } from './FallbacksCard.tsx'
+import { GeneralFallbacksRow } from './GeneralFallbacksRow.tsx'
+import {
+  ConversationFallbackSwitch, fallbackSwitchDefinition,
+} from './ConversationFallbackSwitch.tsx'
+import { SubagentRoleBadge } from './SubagentRoleBadge.tsx'
+import {
+  FallbacksSettingsController, FALLBACKS_SETTINGS_NS,
+  refreshCatalogIfLoaded, refreshFallbacksIfLoaded, refreshSwitchesIfLoaded,
+  type FallbacksRemote,
+} from './fallbacks-store.ts'
+import { en, NS, zh } from './locales.ts'
+
+export type { FallbacksCardInjected, FallbacksCardProps } from './FallbacksCard.tsx'
+export type { GeneralFallbacksRowInjected, GeneralFallbacksRowProps } from './GeneralFallbacksRow.tsx'
+export type {
+  ConversationFallbackSwitchProps, FallbacksSwitchChatData,
+} from './ConversationFallbackSwitch.tsx'
+export type { SubagentRoleBadgeProps } from './SubagentRoleBadge.tsx'
+export type { FallbacksSettingsState } from './fallbacks-store.ts'
+export { FallbacksSettingsController, FALLBACKS_SETTINGS_NS } from './fallbacks-store.ts'
+
+/**
+ * Required services (cordis fiber inject); registrations wait on the slot
+ * declaration. `uiConversation` is declared because the D1 Definition
+ * registration reads the service directly (`ctx.uiConversation.events.register`
+ * at the bottom of `apply` — explicit fiber-ordering parity with the
+ * ui-workflow-run precedent, whose inject list includes it for the same
+ * direct read). Cordis would still provide the service synchronously on
+ * apply, but the declaration makes the dependency honest. `sessions` is
+ * deliberately NOT injected (S-g): a non-web host without the dsh-session
+ * client service must not hang the fiber waiting for it — the wiring reads
+ * it reflectively and degrades to the switches empty state when absent
+ * (`setCurrentSession` never called, `loadSwitches` ready with an empty
+ * array, which the store already supports).
+ *
+ * The host's dotted-namespace contract: each client Remote namespace is a
+ * child-fiber service named `remote.<ns>` (upstream `remoteServiceKey`), and
+ * the traceable proxy forwards `ctx.remote.llm` / `.settings` / `.session`
+ * to those context properties — consumers MUST declare the dotted names
+ * here or the fiber walk throws `cannot get property "remote.llm" without
+ * inject`. `remote` stays for the `$on` invalidation face.
+ */
+export const inject = ['slots', 'locale', 'connection', 'remote', 'uiConversation', 'remote.llm', 'remote.settings', 'remote.session']
+
+/**
+ * The session the client is LOOKING at, derived from the sessions-list
+ * snapshot. The host moved view ownership out of `SessionListState` (the
+ * `current` field is gone — "navigation belongs to view owners"): the viewed
+ * session is the one the shell retains under the `mainView` reference source,
+ * surfaced as a positive `retainedBy.mainView` count on the row
+ * (`SessionSummary.retainedBy`, the same signal `ui-session`'s main-view
+ * derivation reads). First match in host list order; `undefined` while no
+ * session is open — the switches face degrades to its empty state.
+ */
+function viewedSessionId(state: SessionListState): SessionId | undefined {
+  // Total over the snapshot (the fold degrades, never crashes): a host whose
+  // list state does not carry the V4-era shape simply has no readable main
+  // view — the switches face stays in its empty state.
+  if (!Array.isArray(state?.ids)) return undefined
+  for (const id of state.ids) {
+    const row = state.byId[id]
+    // Structural read: the `mainView` key is declared by the ui-session
+    // package's `SessionReferenceSourceMap` merge, and that merge is not in
+    // this program (ui-session is not a peer — the same reason
+    // SubagentRoleBadge consumes its seat structurally).
+    const mainView = (row?.retainedBy as { mainView?: number } | undefined)?.mainView ?? 0
+    if (row !== undefined && mainView > 0) return id
+  }
+  return undefined
+}
+
+/**
+ * Register the `fallbacks` dictionaries and the plugin-config card once the
+ * `plugins.bundle.config` declaration is on the ledger.
+ * @param ctx - client root context.
+ */
+export function apply(ctx: ClientContext): void {
+  ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'llm-fallbacks: dictionaries')
+
+  const connection = ctx.get('connection') as ConnectionHandle
+  // The host (`dsh-session` SessionStore) and client (`ISessions`) Context
+  // merges collide in out-of-tree client programs, so read the service through
+  // the reflection layer with the client face pinned — the same pattern as the
+  // `connection` handle above (the dsh repo keeps the two merges in separate
+  // tsconfig programs; a third program sees both). `sessions` is optional
+  // (S-g): absent on a non-web host → the switches face stays empty.
+  const sessions = ctx.get('sessions') as unknown as ISessions | undefined
+  // The store reads/writes the fallbacks config over the connection's
+  // generic RPC channel (the host gateway `/api/fallbacks/get|set|reset`);
+  // the describe `writable` + namespace directory, the provider/model
+  // catalog, and the switch-history tail page ride `ctx.remote` (guide §9).
+  // The generated namespace merge ships with the host build, so the boundary
+  // casts once to the store's structural face — the session-controller
+  // client's `ctx.remote as unknown as SessionRemotes` pattern. The dotted
+  // namespace services `remote.llm` / `remote.settings` / `remote.session`
+  // are declared in `inject` (the dotted-namespace contract): the traceable
+  // proxy forwards `ctx.remote.<ns>` to the child-fiber service
+  // `remote.<ns>`, which the fiber walk only resolves when the dotted name
+  // is injected — dropping one throws `cannot get property "remote.settings"
+  // without inject` at card load.
+  const controller = new FallbacksSettingsController(
+    ctx.remote as unknown as FallbacksRemote,
+    connection.rpc,
+  )
+  // The card's uSES selector hook, bound once to the controller's store and
+  // handed to the renderer through the inject face (advisor pattern).
+  const useSnapshot = bindSnapshotSelector(controller.store)
+
+  // Pushed invalidations converge every open surface without polling. The
+  // 20260811 dsh snapshot dropped the client-side settings/catalog events;
+  // the runtime now forwards the settings seam's raw-section event and the
+  // llm registry's topology event through the `remote` service (inject list):
+  // - `settings/document-updated(ns, revision)` — ns-filtered to the
+  //   fallbacks namespace; refetches the descriptor + recent-switch summary
+  //   (never the catalog),
+  // - `llm/adapters-updated()` — payload-free; refetches only the
+  //   provider/model catalog (never the form),
+  // - `connection/reset` — client event; refetches all three, coalesced
+  //   through the advisor microtask debounce (a burst of resets = one
+  //   refetch; the IfLoaded guards keep an unopened card idle),
+  // - a `sessions.list` current change reloads the status block's switches
+  //   for the new session (spec §2.5 D-5; the subscription also covers
+  //   reconnects, which re-pull the list).
+  ctx.effect(() => {
+    const syncSession = (): void => {
+      controller.setCurrentSession(sessions === undefined ? undefined : viewedSessionId(sessions.list.getSnapshot()))
+    }
+    if (sessions !== undefined) syncSession()
+    // The `$on` listener seat is `Events['settings/document-updated']`
+    // (`(ns: SettingsNamespace, revision: number) => void`); the widened
+    // optional-string param mirrors dsh-client-ui-settings' settings-scope
+    // (`refresh` bound to the same remote event), and `undefined` ns passes
+    // the filter so the connection/reset path can share this helper.
+    const refresh = (ns?: string): void => {
+      if (ns !== undefined && ns !== FALLBACKS_SETTINGS_NS) return
+      refreshFallbacksIfLoaded(controller)
+      refreshSwitchesIfLoaded(controller)
+    }
+    const refreshCatalog = (): void => { refreshCatalogIfLoaded(controller) }
+    let pendingReset = false
+    // Effect-teardown latch (qc3 S-2): `connection/reset` can land in the
+    // same tick the plugin unloads (HMR / fiber dispose); the cleanup below
+    // then disposes every subscription and the controller, but the queued
+    // microtask would still run and start discarded RPCs (the generation
+    // guard only drops their responses, it does not stop the calls).
+    // `disposed` is set synchronously in the cleanup, so the queued refresh
+    // becomes a no-op.
+    let disposed = false
+    const refreshAll = (): void => {
+      if (pendingReset) return
+      pendingReset = true
+      queueMicrotask(() => {
+        pendingReset = false
+        if (disposed) return
+        refresh()
+        refreshCatalog()
+      })
+    }
+    const disposers = [
+      ctx.remote.$on('settings/document-updated', refresh),
+      ctx.remote.$on('llm/adapters-updated', refreshCatalog),
+      ctx.on('connection/reset', refreshAll),
+      ...(sessions === undefined ? [] : [sessions.list.subscribe(syncSession)]),
+    ]
+    return () => {
+      disposed = true
+      for (const dispose of disposers) dispose()
+      // F-006 / M-01: stop in-flight describe/get/set/reset/session-follow
+      // responses from publishing to the dead store once the plugin unloads
+      // (HMR/dispose) — the generation guard only helps when it is actually
+      // bumped here.
+      controller.dispose()
+    }
+  }, 'llm-fallbacks: pushed invalidations')
+
+  // The card registers into the plugin-config page's keyed card slot with
+  // the upstream card shape — generator + `yield`, `locale: NS`, and an
+  // inject face carrying ONLY the business surface (controller +
+  // useSnapshot). The typed `t` seat is synthesized by the renderer from
+  // `locale: NS` (PropsLocale<'fallbacks'>), exactly like the upstream
+  // three cards and the advisor card; the old Settings-nav section
+  // registration (the "Fallbacks" nav entry) is removed — deleting the
+  // section registration deletes the nav entry. The host made the slot keyed:
+  // `key` is the settings namespace the card edits, and the card renders in
+  // the current Plugins page: `plugins.bundle.config` keyed by bundle package name
+  // (was `settings.plugin.item` with key = settings namespace).
+  const BUNDLE_NAME = '@local/dsh-llm-fallbacks-custom'
+  ctx.slots.inject('plugins.bundle.config', function* () {
+    yield ctx.slots.register({
+      name: 'plugins.bundle.config',
+      key: BUNDLE_NAME,
+      locale: NS,
+      // Hooks compartment: renderer binds `hooks.snapshot` → useSnapshot.
+      inject: () => ({ controller, hooks: { snapshot: controller.store } }),
+    }, FallbacksCard)
+  })
+
+  // The General settings page status row (plan fallbacks-aux-seams T1): a
+  // compact read-only row (enabled badge + recent-switch summary) in the
+  // `settings.general.item` list slot — the same registration shape as the
+  // upstream preference rows (locale language 0 / ui-theme appearance 10 /
+  // ui-conversation composer-enter 20 / ui-agent-preset agent-preset -25).
+  // id `fallbacks`, order 100: the informational row renders at the column
+  // end, after every preference row (ascending stable sort, ui-slots). The
+  // row consumes the SAME controller + useSnapshot as the card — the first
+  // mount lazy-loads (idle guards inside the row) and the pushed
+  // invalidations above keep it fresh once read; no new data path.
+  ctx.slots.inject('settings.general.item', function* () {
+    yield ctx.slots.register({
+      name: 'settings.general.item',
+      id: 'fallbacks',
+      order: 100,
+      locale: NS,
+      inject: () => ({ controller, useSnapshot }),
+    }, GeneralFallbacksRow)
+  })
+
+  // Conversation-level switch visibility (plan fallbacks-aux-seams T2,
+  // D1+D2 seam): every `fallbacks/switch` event renders as a compact
+  // system-style line in the chat transcript at its event seq — the user
+  // sees each recovery happen in place. Two registrations, both render-only
+  // (no model-context injection — C4 excluded):
+  // - D1: the `uiConversation.events` Definition registry accepts the
+  //   `fallbacks-switch` node (kind `fallbacks-switch`, target `chat`,
+  //   match on the non-surface `fallbacks/switch` event — today the
+  //   `unknown-surface` fallback only admits append-surface events, so the
+  //   transcript showed nothing);
+  // - D2: the `conversation.chat.node` keyed seat dispatches the renderer
+  //   by node kind (external registration shape `{ name, key, locale }` —
+  //   ui-workflow-run / ui-tool / ui-goal precedent). No inject face: the
+  //   node payload arrives through the keyed seat's `node` prop.
+  // D1 (cont.): the registry's `register` returns an idempotent disposer
+  // (`event-registry.ts:19-27`); wire it into an explicit effect so plugin
+  // unload/HMR teardown is symmetric with the other subscriptions (same
+  // pattern as the dictionaries effect above). The registry ALSO auto-
+  // disposes through its own owner-effect (`definition-registry.ts:43-51`) —
+  // the disposer is idempotent, so both teardown paths are safe, no
+  // double-dispose.
+  ctx.effect(
+    () => ctx.uiConversation.events.register(fallbackSwitchDefinition),
+    'llm-fallbacks: conversation node definition',
+  )
+  ctx.slots.inject('conversation.chat.node', function* () {
+    yield ctx.slots.register({
+      name: 'conversation.chat.node',
+      key: 'fallbacks-switch',
+      locale: NS,
+    }, ConversationFallbackSwitch)
+  })
+
+  // Session-header subagent role badge (plan subagent-role-badge T3; durable
+  // channel plan Task 3b): a compact read-only pill in the
+  // `conversation.session.header.actions` list slot (scope 'session') showing
+  // which Subagent role the viewed session's dispatch resolved — hover
+  // `role → latest request route`. Render-only (C4 pattern): a view
+  // contribution, no message construction, no model-context injection. Its data
+  // is the host's `fallbacksSubagentRole` session projection, read through the
+  // session-kit `useProjection` seat the component takes structurally (the
+  // compiled peer types do not carry the ui-session merge into this program; see
+  // the component docblock) — NO inject face and no rpc: the plugin gateway and
+  // the badge's polling probe are gone (Task 3b). Degrade-never-crash: an absent
+  // key / a foreign value / `inherit` / a skewed host render `null`.
+  // Placement (user decision 2026-09-11; verified against the installed
+  // `@deepseek-ai/dsh-client-ui-*` on 2026-09-11 — a host-side
+  // reorder can shift this placement): the actions row hosts the agent-preset
+  // (mode) chip (`dsh-client-ui-agent-preset` AgentPresetLabel, id
+  // `agent-preset`, order -10), then the schedule catalog (order 10) and the job
+  // list (order 20). order -5 sorts the badge immediately AFTER that chip and
+  // BEFORE the schedule/jobs actions (the list slot's ascending stable sort), so
+  // the role sits next to the agent-preset chip instead of the far-right
+  // utilities strip. (`dsh-client-ui-open-in-app` is a utilities-row occupant,
+  // not an actions-row one.)
+  ctx.slots.inject('conversation.session.header.actions', function* () {
+    yield ctx.slots.register({
+      name: 'conversation.session.header.actions',
+      id: 'fallbacks-subagent-role',
+      order: -5,
+      locale: NS,
+    }, SubagentRoleBadge)
+  })
+}

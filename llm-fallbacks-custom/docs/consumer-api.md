@@ -1,0 +1,242 @@
+# Consumer Contract (Consumer API)
+
+This document defines the **consumer surface** `dsh-llm-fallbacks` exposes: (1) the package-root library API (`import { … } from 'dsh-llm-fallbacks'`); (2) the named cordis service (`ctx.get('llm-fallbacks')`). No logic is copied between the two: the service's four legacy callables are the same function references as the library re-exports, its three role-seed methods are per-apply closures over the same `FallbacksSeedManager` the gateway uses, and `getAgentRole` reads the dispatch seam's own per-child record (single point of truth — see [Lifecycle](#lifecycle) and [Dispatch role getter](#dispatch-role-getter)). Installation → [docs/install.md](install.md); release process → [docs/release.md](release.md).
+
+> **Contract boundary**: this document describes **this package's** export surface and lifecycle. **A valid package contract ≠ an integrated downstream repository** — whether integration is complete must be judged by the actual wiring in the target repository.
+
+## Library API (package-root re-export)
+
+`src/index.ts` re-exports the runtime functions, value constants, and types uniformly from the package root, so consumers `import { … } from 'dsh-llm-fallbacks'` directly without reaching into submodule paths.
+
+### Minimal example
+
+```ts
+import { resolveRole, resolveChain, validateFallbacksConfig } from 'dsh-llm-fallbacks'
+
+// resolveRole: matches roles.rules in origin/provider/model order → role id (no match → 'inherit')
+const role = resolveRole(agent, config.roles.rules, roleIds)
+
+// resolveChain: concatenates the role chain + rootChain and returns surviving candidates (same as the decision path)
+const candidates = resolveChain(config.roles.list, config.rootChain, role, provider, model)
+
+// validateFallbacksConfig: validates the config; problems are warned via logger.warn (never throws)
+validateFallbacksConfig(config, logger)
+```
+
+### Function exports
+
+| Export | Description |
+|---|---|
+| `resolveRole(agent, rules, roleIds, warn?, servedRoute?)` | Matches `roles.rules` in `origin`/`provider`/`model` order and returns the matched role id; returns the built-in `'inherit'` when no rule matches or a referenced role is undeclared. `servedRoute` is the optional route the request was **actually served by** (omitted by every non-virtual caller, which leaves the behavior unchanged); when it is present a rule matches if it matches **either whole pair** — the recorded one or the served one, never a mix of the two — so a rule keyed on the real chain head keeps matching for a delegated child whose recorded pair is the virtual `FallbacksChain/Auto` row. |
+| `resolveCandidate(entry, failing, modelExists?)` | Resolves a single chain entry into a candidate; `provider/*` wildcards expand to the failing models; returns `null` for invalid entries or failed existence probes. |
+| `resolveChainViews(roles, rootChain, role, provider, model, warn?)` | Single-pass resolution of a role's concatenated chain, returning the unfiltered candidate views `{ all, wildcard }` (`wildcard[i]` marks whether candidate `all[i]` came from a wildcard entry). |
+| `selectCandidates(all, wildcard, filter?, modelExists?)` | Applies the filter and existence probes to the candidate views, returning the list of surviving candidates. |
+| `resolveChain(roles, rootChain, role, provider, model, filter?, modelExists?, warn?)` | Full chain resolution (same as the decision path): concatenates the role chain + `rootChain` (`fallback: 'none'` appends nothing), returning the surviving candidates. |
+| `hasWildcardEntry(roles, rootChain, role)` | Detects whether a role's concatenated chain contains `provider/*` wildcard entries — callers use it to decide whether catalog existence probes are needed (same source as resolution, no over-approximation). |
+| `createCandidateFilter(options)` | Builds a candidate filter: skips the current model, models in cooldown, models already failed in this step, and missing model ids. |
+| `annotateCandidates(candidates, surviving, options)` | Annotates each candidate with its skip reason (`skip` undefined = surviving), for visibility / logging. |
+| `validateFallbacksConfig(config, logger)` | Validates config legality (undeclared role references, illegal chains, etc.); problems are warned via `logger.warn` (never throws). |
+| `detectLegacyKeys(source)` | Detects removed legacy keys (e.g. `chains`) in the config, returning the list of keys hit. |
+| `parseSelector(input)` | Parses a `provider/model` or `provider/*` selector; throws `SelectorError` on invalid input. |
+| `readRoleProjectionValue(value)` | Defensive read of a `ROLE_PROJECTION_KEY` projection value: returns it only when it is a non-blank string, otherwise `undefined` — a missing key / no frame yet / a foreign value all read as "no role" so the role pill collapses instead of naming something wrong. |
+
+### Value exports
+
+| Export | Description |
+|---|---|
+| `INHERIT_ROLE_ID` | Built-in reserved role id `'inherit'` (fallback target when no rule matches). |
+| `ROLE_ID_PATTERN` | Role id format regex `/^[a-z0-9-]{1,32}$/`. |
+| `defaultFallbacksConfig` | Default config object (default `triggerCodes`, empty chains; no `enabled` key — the switch was removed). |
+| `provide` | Declarative service metadata `['llm-fallbacks'] as const` (for loader/tool recognition; actual registration happens inside the plugin's settings inject child — see the named service section below). |
+| `SelectorError` | The catchable error class thrown by `parseSelector` — catch-side type safety depends on it. |
+| `presetRoles` | The 5 bundled omp-style preset role declarations — `readonly SeedDeclaration[]`, pure data module, the exact payload the plugin self-declares on apply. Derivation: omp bundled agent prompts `packages/coding-agent/src/prompts/agents/`, snapshot 2026-08-16; persona text frozen per the plugin spec §9.2. See [Preset roles](#preset-roles). |
+| `ROLE_PROJECTION_KEY` | The host session-projection key `'fallbacksSubagentRole'` the role pill reads (`useProjection(ROLE_PROJECTION_KEY)`) — the DURABLE declared-raw-role read, published after the child's first `agent/pre-step`; read it through `readRoleProjectionValue`. |
+
+### Preset roles
+
+`presetRoles` is the single source of the plugin's bundled preset-role declarations — the identical 5-item payload `apply()` self-declares when `presets: 'bundled'` (the default). The 5 ids are `reviewer` / `scout` / `security-reviewer` / `sonic` / `task`; each persona is a concise instruction set distilled from the omp bundled agent prompts (`packages/coding-agent/src/prompts/agents/`, snapshot 2026-08-16), not a verbatim copy of a full prompt.
+
+> **Preset trim**: the bundled set previously carried 7 ids — `designer` and `librarian` were removed. Rows saved by earlier versions keep their persona and survive bundled declares untouched; omission from that producer's slice means only that the plugin no longer has a live declaration for these ids. They now show source `user` only when no live producer still declares the id, even though the operator never wrote those rows: only then does the card render them as ordinary editable rows — the `User` badge, full editing UI, no seeded-row read-only treatment. A row a companion still declares stays seeded and read-only, with the winning producer's source label (`external` when unnamed, otherwise its registered set name); the mstar merge-preserve pattern can do this by copying currently seeded non-own ids verbatim. Delete them by hand if unwanted.
+
+Reuse it through any seed face:
+
+```ts
+import { presetRoles } from 'dsh-llm-fallbacks'
+
+// (a) service face (plugin applied): one line, same payload as the self-declaration
+const fb = ctx.get('llm-fallbacks')
+if (fb !== undefined) await fb.declareSeeds(presetRoles)
+
+// (b) class face: new FallbacksSeedManager(logger).declare(presetRoles, seedsIo)
+```
+
+A consumer's declare of `presetRoles` is an external declare: the plugin's own preset self-declaration is the only declare labeled `bundled` (reserved label, unreachable through the service face). Pass `{ set: 'my-plugin' }` as the second argument to label the batch with your registered set name — see [Role seeds](#role-seeds-service-seeding-api).
+
+Operator-facing behavior of the automatic declaration (config key `presets: 'bundled' | 'none'`, upgrade / conflict / deletion semantics) → [docs/configuration.md → Preset roles](configuration.md#preset-roles-presets-key).
+
+### Type exports
+
+`FallbacksConfig` / `FallbacksRole` / `FallbacksRoles` / `FallbacksRoleRule` / `FallbackStrategy` / `RevertPolicy` / `RecoveryPolicy` / `Origin` / `AgentLike` / `Selector` / `FailingModel` / `AnnotatedCandidate` / `CandidateSkipReason` / `CandidateFilterOptions` / `FallbacksConfigLogger` / `FallbacksService` — all `export type`, compile-time only. The role-seeds types (`SeedDeclaration` / `SeedSkipReason` / `SeedConflict` / `SeedDeclareOutcome` / `EffectiveRole` / `EffectiveRolesReadback` / `SeedRevertFailReason` / `SeedRevertOutcome` / `SeedsWireStatus` / `SeedsDeclareOptions` / `SeedSource` / `SeedsIo`) and the `FallbacksSeedManager` class are also re-exported from the package root — see [Role seeds](#role-seeds-service-seeding-api).
+
+### Existing plugin exports (unchanged)
+
+`name` / `Config` (schemastery schema) / `stateStore` / `countRetryEvents` / `apply` and the event and state types (`FallbackSwitchReason` / `FallbacksSwitchEventData` / `AgentFallbackState` / `FallbackStateStore` / `PendingSwitch` / `SwitchScope` / `StepFailures`) continue to be exported from the package root, zero regression.
+
+> **Mechanical guard (S-3)**: the SSOT for the runtime export inventory above (functions / values / existing plugin exports) is `LIBRARY_EXPORT_KEYS` in `tests/export-surface.spec.ts` — adding or removing any runtime key in this inventory requires syncing that array (and the `valueExports` type mapping in the same file), or CI fails. The type export inventory is pinned by the `expectTypeOf` block in the same file (dev-time type pin, checked by local tsc).
+
+## Named service (`ctx.get('llm-fallbacks')`)
+
+Once the plugin's settings write channel is bound, a service is registered on the cordis `Context` under the name `'llm-fallbacks'` (provided from inside the plugin's settings inject child — see [Lifecycle](#lifecycle)). **It is a small face over the library logic — not a second library API**: the four legacy callables are reference-identical to the library re-exports, the three role-seed methods are per-apply closures over the seed manager, and `getAgentRole` closes over the dispatch seam the persona/notice path writes (state stays behind the closures, spec §9.5) — no copied logic on either side. Runtime state (cooldown, recent switches, etc.) is not part of the contract — cross-plugin state reads should listen to `fallbacks/switch` events instead of reading service object internals. Caveat: the plugin writes **no** durable `fallbacks/switch` events (issue #52 — the apply()-time event-type registration was proven ineffective), so events cannot serve as a live state channel: new switches are recorded in the info logs, and in-session recent-switch surfaces (`/fallbacks`, settings card) reflect only events already in the session history. Sessions written by older plugin versions that contain such events are triaged by the plugin repo's `pnpm repair:session-logs` tool: the released migration chain refuses the event type even with `ignorable: true`, so the default run is a read-only report and only the explicit lossy `--drop-legacy-events` opt-in can recover such a log (see [Repair existing sessions](repair.md#repair-existing-sessions) / [install.md](install.md) notes). For state that must stay current in-process, prefer in-process reads over the persisted events.
+
+### Shape
+
+```ts
+{
+  name: 'llm-fallbacks'          // matches the plugin name
+  version: string                // package.json version (snapshot taken at module load)
+  resolveRole: typeof resolveRole
+  resolveChain: typeof resolveChain
+  validateFallbacksConfig: typeof validateFallbacksConfig
+  detectLegacyKeys: typeof detectLegacyKeys
+  declareSeeds: (seeds: readonly SeedDeclaration[], options?: SeedsDeclareOptions) => Promise<SeedDeclareOutcome>
+  getEffectiveRoles: () => EffectiveRolesReadback
+  revertSeededPersona: (id: string) => Promise<SeedRevertOutcome>
+  getAgentRole: (agentId: string) => string | null
+}
+```
+
+The service surface **deliberately excludes** runtime state (no `stateStore` / event emitter) and the filtering helpers — those go through library imports only. The static export `provide = ['llm-fallbacks'] as const` is declarative metadata (for loader/tool recognition); the actual registration happens inside the plugin's settings inject child, which settles just after `apply()` returns (see [Lifecycle](#lifecycle)). The three role-seeds keys (a)(b)(c) are strictly additive — see [Role seeds](#role-seeds-service-seeding-api) below; `getAgentRole` is additive too — see [Dispatch role getter](#dispatch-role-getter).
+
+### Dispatch role getter
+
+`getAgentRole(agentId)` reports the dispatch role of a **live agent**, keyed by child session id (`Agent.id`) — the immediate in-memory read a companion needs at dispatch time (attribute work, label UI, gate behaviour) without waiting for the child's first step.
+
+```ts
+getAgentRole(agentId: string): string | null
+```
+
+- **Timing**: a LOCAL backend creates the child INSIDE the native activation call, so the seam reserves the child id and writes the record at dispatch, before that call — the getter answers as soon as the child is dispatched, earlier than the durable notice row / projection, which are readable only after the child's first non-empty `agent/pre-step`. An EXTERNAL/ACP backend allocates its OWN child id, so its record is keyed only once the resolved activation (or the parent-owned `subagent/catalog` correlation) reports that id — never before the native call returns. A LOCAL child's record is removed on `agent/disposed`, so it lives exactly for that child's activation lifetime; an external/ACP record has no local agent lifecycle to observe and remains until the plugin itself disposes (which clears the map).
+- **Value**: the **DECLARED RAW** role id the seam resolved (as declared — trimming preserved), i.e. the same id the persona delivery and the chain-head model selection resolved. `null` (never `undefined`) whenever no dispatch role resolved for that id: no header, an undeclared role id, `inherit`, or an unknown id.
+- **Not a durable surface**: the notice row and the `ROLE_PROJECTION_KEY` projection stay the durable read; this getter adds no write path and no new state. It reports the record's **live dispatch hint** — a resume that reuses the child id may rewrite it, while the durable notice row keeps the child's FIRST announced role, so the two can disagree after a re-dispatch and no consumer may treat the getter as the durable role.
+- **Non-local providers**: an external/ACP provider creates no local agent, so nothing is recorded at dispatch — but a record still appears once the resolved activation (or the parent-owned `subagent/catalog` correlation) supplies its child id, and the getter then reports the same declared raw role. `null` until then, and whenever no dispatch role resolved for that id.
+
+```ts
+const fb = ctx.get('llm-fallbacks')
+const role = fb === undefined ? null : fb.getAgentRole(childSessionId)
+```
+
+### Probe example
+
+Same usage as the mstar loader-probe: probe availability with `!== undefined` first, then call.
+
+```ts
+const fb = ctx.get('llm-fallbacks')
+if (fb !== undefined) {
+  fb.resolveRole(agent, rules, roleIds)
+}
+```
+
+### Lifecycle
+
+- **Available once the settings write channel is bound**: the plugin provides the service from inside its `ctx.inject(['settings'], …)` child — the child's callback binds the seed write channel first, then provides the service in the same synchronous body — so `ctx.get('llm-fallbacks')` starts returning the service object only once that child settles. Service visibility therefore implies `declareSeeds` can write: the probe-then-call minimal pattern is race-free, and declaring the moment the service first probes non-`undefined` persists roles on the first attempt (no retry, no delay, no buffering). The service never probes non-`undefined` synchronously during `apply()` — cordis keeps the owner child fiber invisible to strict `get` until its callback body completes — so there is no apply-time window either. While visible: the four legacy callables are the same function references as the library re-exports, the three seed methods are per-apply closures over a `FallbacksSeedManager` (seed state lives behind the closure, spec §9.5 — not on the service object), `getAgentRole` reads the fiber's own seam record map (no role state on the service object), and `version` equals the package.json version.
+- **Withdrawn with the settings channel or the plugin**: the registration is owned by the settings inject child, so the service unregisters when the settings service goes away (settings teardown or plugin dispose) and is provided again when settings re-appear (the bundled preset self-declaration re-fires idempotently on that re-appearance). After withdrawal, `ctx.get('llm-fallbacks')` is `undefined` — the strict `get` returns `undefined` for a missing implementation, never throwing. A composition without any settings service never sees the service at all (its seed surface would be unwritable, so there is nothing to expose). Probe per use rather than caching the service reference across a settings teardown — a cached reference can outlive the registration.
+
+### Type merging
+
+Importing this package automatically merges the `Context` type (`declare module '@deepseek-ai/cordis'` augments `'llm-fallbacks'?: FallbacksService`), so consumers **do not need to declare it themselves**; the `FallbacksService` type is also exported from the package root. Without importing this package's types, `ctx.get('llm-fallbacks')` degrades to the untyped overload.
+
+### Role seeds (service seeding API)
+
+The service grows three additive keys — the six pre-existing keys are unchanged (strictly additive, spec §9.1). Companion plugins use them to auto-provision role rows into the taxonomy with **zero operator hand-edit** (no config block, no bundle-row write): a seeded role is a plain `roles.list` row, and the settings card surfaces the seed state over the gateway wire — a seeded row presents as reference material, not editable config: no id input (the collapse title carries the immutable id, so the id of any seed/preset role cannot be changed in the card, R2), the persona renders as a read-only single-line brief with an expandable full view (no persona editor, no revert button), while chain and fallback stay editable; every row carries a source badge (`bundled` / declared set name, `external` when unnamed / `User`).
+
+The seeded persona stays inside the card: the collapsed brief ellipsizes and the expanded view wraps, without widening the settings panel.
+
+```ts
+declareSeeds(seeds: readonly SeedDeclaration[], options?: SeedsDeclareOptions): Promise<SeedDeclareOutcome>
+getEffectiveRoles(): EffectiveRolesReadback
+revertSeededPersona(id: string): Promise<SeedRevertOutcome>
+```
+
+| Method | Surface | Notes |
+|---|---|---|
+| `declareSeeds(seeds, options?)` | (a) declare | **Per-producer replacement semantics**: the batch is the declaring producer's full current declaration set; it replaces only that producer's slice. Ids omitted from the batch leave that slice, not other producers' slices; they remain seeded while any live declaration covers them (the role row and the operator's chain remain — R2). Per-id validation **as declared** — an id failing `ROLE_ID_PATTERN` (`/^[a-z0-9-]{1,32}$/`) or equal to the reserved `'inherit'` is skipped with a warn (never coerced); valid siblings in the same batch still apply. The optional `options.set` selects the producer label (trimmed): an empty-after-trim, non-string, or reserved value (`bundled` / `user` / `external`) warns once and degrades the batch to the shared unnamed `external` slice — the seeds still apply. Re-declaring the same payload performs no settings write. |
+| `getEffectiveRoles()` | (b) readback | Sync. The effective taxonomy with per-role seed annotations (`seeded` / `personaOverridden` / `seedPersona` / `source`). |
+| `revertSeededPersona(id)` | (c) revert | Restores one id to the **currently declared** seed default resolved through the same producer precedence as readback — never a snapshot of the first seed. `{ reverted: false, reason: 'not-seeded' }` when no live declaration covers the id (no write, no throw). |
+
+#### Minimal example
+
+```ts
+const fb = ctx.get('llm-fallbacks')
+if (fb !== undefined) {
+  // (a) declare — this producer's FULL current set; the same payload performs no settings write.
+  // `set` selects an independent producer slice (omit it to share the `external` slice)
+  const outcome = await fb.declareSeeds([
+    { id: 'code-reviewer', persona: 'Reviews code for correctness and security' },
+    { id: 'fullstack-dev', persona: 'Backend-led fullstack implementation' },
+  ], { set: 'code-companion' })
+  // outcome: { applied: string[], skipped: Array<{ id, reason }>, conflicts: Array<{ id, kind }> }
+
+  // (b) read back effective roles with seed annotations
+  const { roles } = fb.getEffectiveRoles()
+  // roles[i].seeded / roles[i].personaOverridden / roles[i].seedPersona / roles[i].source
+
+  // (c) revert one id to the CURRENT declared seed default
+  const outcome2 = await fb.revertSeededPersona('code-reviewer')
+  // outcome2: { reverted: true, persona } | { reverted: false, reason }
+}
+```
+
+#### State model and conservative override semantics
+
+Two stores, strictly separated (spec §9.2):
+
+1. **Operator config (persisted — the only persisted store)**: a seeded role is a plain `roles.list` row `{ id, persona }`. `chain` / `fallback` / `prompt` / `permissions` are **omitted** on insert — seeds never write those values (R4).
+2. **Seed registry (in-memory, per-apply)**: keyed by producer label (`bundled` / registered set name / `external`), with each producer's current id → default-persona slice and declaration recency; declare = replacement **per producer**, never of the whole registry.
+
+`seeded`, `personaOverridden`, and `source` are **derived at read time**, never stored — because nothing override-shaped or provenance-shaped is persisted, a config round-trip cannot orphan an override (AC-3), and provenance can never churn a settings write.
+
+Declare keeps its compute → write → commit order and zero-delta check: a failed settings write does not commit the new slice, and a provenance-only change performs zero settings writes. Revert uses the same precedence as readback. At-default tracking/materialization drives row writes from the id's **resolved effective default** (`prior` = the resolved default before the declare; `incoming` = the resolved default after the candidate commit), with an existing row tracking only when its persona equals `prior` and `incoming` differs. A producer that does not win the id cannot advance its persisted persona; a same-persona attach is quiet, and omission from a batch leaves the row untouched (R2).
+
+- An operator persona edit is an **override** (the row persona differs from the seed default); the card shows the effective persona (read-only on seeded rows).
+- Revert always restores the **currently declared** seed default resolved through the producer precedence below — when the winning producer re-declares a new persona for the same id, revert goes to that new default.
+- A declared id that already has an operator row is **attached, never duplicated**; a differing persona is flagged loudly as a `'persona-source'` conflict — the operator persona is retained, never silently overwritten.
+- When a producer removes a declaration, the role row and the operator's chain remain; another producer's live declaration keeps the row seeded. Only when no live declaration covers it does the row drop out of the live seed status, render as an ordinary editable row, and read source `user` (R2).
+- Seeds never write `chain` / `fallback`: an existing chain is preserved byte-for-byte, and a new seeded role keeps an empty chain for the operator to fill (R4).
+- **Honest limitation**: the registry dies with the fiber/process. Until a producer re-declares a row, it is an ordinary config row (source `user`); after re-declare, "was at default" is indistinguishable from "operator-edited", so the conservative row-untouched path applies and a differing persona is flagged `'persona-source'`. Revert always restores the current declared default; no data is ever lost or silently overwritten.
+- **Slice lifetime/growth**: slices are dropped only by an empty declare under the same producer label or when the fiber/process ends; there is no other pruning. For the remaining fiber/process lifetime, a producer that stops declaring keeps its rows seeded and keeps winning readback/revert unless superseded by the documented precedence. Producers should use a stable `{ set }` label: varying labels grow the registry and the per-row resolution scan.
+
+#### Per-row source (provenance contract)
+
+Every row carries a provenance label (`SeedSource`) on both the `EffectiveRole` readback and the gateway `seeds` wire entries (`SeedsWireStatus.source` — additive wire field: older clients ignore unknown fields, and a gateway predating the field may omit it, in which case the client treats the entry as badgeless). `bundled` is reserved for the plugin's own preset self-declare and is unreachable through the service face — the face forwards only the public `{ set }` key to the declare pipeline:
+
+**Resolution precedence**: `bundled` wins for any id the plugin's own preset self-declare currently declares; otherwise the **most recent non-bundled producer** declaring the id wins; no live declaration means `user`. Unnamed producers share **one `external` slice** — declare with `{ set: '<name>' }` to keep an independent slice.
+
+| `source` value | When |
+|---|---|
+| `bundled` | The plugin's own bundled preset self-declare currently declares the id, even if another producer also declares it (internal marker, not a consumer option). |
+| `<set name>` | No bundled declaration covers the id, and the most recent non-bundled producer declaring it has this valid `options.set` (trimmed). |
+| `external` | No bundled declaration covers the id, and the most recent non-bundled producer declaring it is the shared unnamed slice: no `set`, or an invalid one (empty after trim / non-string / a reserved name — warns once, the seeds still apply). |
+| `user` | No live declaration covers the row. |
+
+Reserved set names (`bundled` / `user` / `external`) are invalid by contract — a declare under a reserved name would forge or shadow the fixed labels, so it warns once and degrades to `external`.
+
+The card localizes the fixed labels `bundled` / `user` / `external` as `内置` / `用户` / `外部` in zh and `bundled` / `User` / `external` in en. Registered set names render verbatim, case-preserved.
+
+**Copy honesty**: the mstar merge-preserve pattern (readback → copy currently seeded non-own ids verbatim → one-arg declare) leaves the plugin's bundled rows `bundled` and seeded; the companion's copies in the `external` slice do not replace the bundled producer's slice. If the bundled producer later drops an id, a still-live companion copy keeps it seeded and resolves through the same precedence. `user` does not mean "the operator wrote this row" — it means no live declaration covers it. After the preset trim, the `designer` / `librarian` rows persisted by earlier versions survive untouched with their persona and show source `user` when no producer still declares them, even though the operator never wrote those rows.
+
+#### Types
+
+| Type | Shape | Meaning |
+|---|---|---|
+| `SeedDeclaration` | `{ id: string; persona: string }` | One declared seed (`persona` is free text, not validated — payload hygiene is the companion's job). |
+| `SeedDeclareOutcome` | `{ applied: string[]; skipped: Array<{ id, reason }>; conflicts: Array<{ id, kind }> }` | Structured result of `declareSeeds` — the readable status channel; per-id skip never fails the batch. `reason` ∈ `'invalid-id'` \| `'reserved-id'` \| `'duplicate-in-batch'`; `kind` ∈ `'persona-source'`. |
+| `SeedsDeclareOptions` | `{ set?: string }` | Optional second `declareSeeds` argument — selects the producer's independent registered slice (trimmed; empty / non-string / reserved warns once and degrades to the shared `external` slice, the seeds still apply). |
+| `SeedSource` | `'bundled'` \| `'external'` \| `'user'` \| (set name) | Per-row provenance label, read-time derived, never persisted — see [Per-row source](#per-row-source-provenance-contract). |
+| `EffectiveRole` | `{ id, persona, chain?, fallback?, seeded, personaOverridden, source, seedPersona? }` | One effective role with seed annotations (`chain` / `fallback` are passthrough — never touched by seeds; `source` is the provenance label). |
+| `EffectiveRolesReadback` | `{ roles: EffectiveRole[] }` | Result of `getEffectiveRoles`. |
+| `SeedRevertOutcome` | `{ reverted, persona?, reason? }` | Result of `revertSeededPersona`; `reason` ∈ `'not-seeded'` \| `'row-absent'` \| `'settings-unavailable'`. |
+| `SeedsWireStatus` | `{ id: string; overridden: boolean; source?: SeedSource }` | Gateway wire entry (card badge state + provenance); the gateway `seeds` field is an array of these. `source` is optional — a gateway predating the field omits it (version skew) and consumers treat a missing label as "no badge". |
+
+## Version metadata
+
+`version` is the package.json version string at publish time (a snapshot read once at module load via `createRequire`), updated with each release; consumers can use it for version gating, but it is **not runtime state** and does not represent any live status.

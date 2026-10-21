@@ -1,0 +1,1258 @@
+/* Fallbacks settings card — FLAT alignment to the official settings-form
+ * language (plan fallbacks-web-ux-alignment T3, the advisor PR #98 pattern;
+ * ui-primitives settings-form: fields.module.css + SettingsForm.module.css,
+ * values via the host reference §3): the fields tile directly under the
+ * page's plugin title/description — NO collapsible box, no header chrome
+ * (the former PluginCard-mirror chrome died with the config-level `enabled`
+ * switch, T2). Field 12px 0 padding with 0.5px l2 hairline separators
+ * between adjacent fields, labels 13px/500, hints 12px tertiary, inputs
+ * 34px on the 0.5px l4 border with the md radius; per-section Discard +
+ * Save action pairs ride the section headings (dark solid Save). Every
+ * color resolves through a
+ * `--dsw-alias-*` token (light/dark adaptive); bare `--border` / `--surface`
+ * / `--text-*` names, which nothing in this app defines, would render the
+ * light-mode literals written as their fallbacks and stay light under the
+ * dark theme.
+ *
+ * Width containment is self-contained: `.root` and `.fieldset` each carry
+ * `min-width: 0` (see their rules) — the measured persona-brief clamp
+ * (plan seeds-source-and-persona-width, fix-wave-1b-report.md) previously
+ * lived on `.card` + `.fieldset`; with the card box gone the same clamp
+ * moves to the flat root div, so a long nowrap persona brief is clipped
+ * inside the component without depending on the host clamping its own
+ * grid/flex track. */
+
+/* The flat root: no visual box (the page owns the section surface) — this
+   div exists to carry the min-width clamp (the card-external half of the
+   persona width containment; see the module header). */
+.root {
+  min-width: 0;
+}
+
+/* Body-level notices: tertiary for read-only, business (info) for the
+   config-channel notice — the fallbacks skeleton stays usable and saves are
+   attempted, so it reads informational, not a dead-end — error tone for the
+   load/write error, with an inline Retry when the form is inert. Flat and
+   always-on — there is no derived-open surface left to hide them behind. */
+.readOnly {
+  margin: 12px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.notice {
+  margin: 12px 0 0;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-state-business-primary);
+}
+
+/* Migration banner (two-block-era legacyKeys detected): a quiet filled box
+   at the top of the flat form — the SC silent-box shape (padding 10/12, no
+   border, r8) on the module fill, business tone text. Informational: the
+   form stays fully editable and a save writes the new format. */
+.legacyNotice {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-module-platform);
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-state-business-primary);
+}
+
+.error {
+  margin: 12px 0 0;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-state-error-primary);
+}
+
+/* A notice row carrying the message and (error + inert form only) the Retry
+   action — the message takes the free space, the inline outline button
+   trails. */
+.noticeRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0 0;
+}
+
+.noticeRow .error {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+}
+
+/* The form body is one fieldset without a legend: the flat section headings
+   are the group markers; `disabled` propagates to every control inside.
+
+   `min-width: 0` is the persona width clamp's fieldset half (plan
+   seeds-source-and-persona-width): a fieldset keeps a content-based minimum
+   (the UA default `min-inline-size: min-content`), and the nowrap
+   `.personaBrief` makes that minimum the FULL persona string, so without
+   this rule the fieldset itself cannot shrink and the brief's ellipsis
+   never engages. It is NOT sufficient on its own: the same content-based
+   minimum re-emerges one level up wherever the component is a host
+   grid/flex item, which is why `.root` carries the matching clamp.
+   Measured in real Chromium on the plan probe
+   (.mstar/sdd/seeds-source-and-persona-width/persona-overflow-probe.html):
+   fieldset-only ⇒ panel scrollWidth 2855px / clientWidth 720px, brief
+   2769px with no ellipsis; fieldset+outer-clamp ⇒ panel 720/720 in both
+   states, brief ellipsizing. Full matrix: fix-wave-1b-report.md. */
+.fieldset {
+  margin: 0;
+  padding: 0;
+  border: none;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* Flat section headings (主代理 / 子代理 / 高级选项): semantic h2 at
+   heading weight (plan fallbacks-card-section-ux T1) — 16px/600 on the
+   primary label color (card-ux-followup T3: enlarged from 14px so the
+   headings clearly outrank the 13px field labels) — laid out as a flex row
+   carrying the section's own Discard + Save pair (T2). 高级选项 hosts the
+   disclosure toggle inside its h2 (T3). */
+.sectionHeading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 4px 0;
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 600;
+  color: var(--dsw-alias-label-primary);
+}
+
+.sectionHeadingText {
+  display: block;
+  min-width: 0;
+}
+
+/* Per-section action pair (plan fallbacks-card-section-ux T2): the
+   Discard + Save buttons right-aligned in the heading row (高级选项: at
+   the end of its expanded body). The compact sizing keeps the pair
+   subordinate to the heading it rides. */
+.sectionActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.sectionActions .discard,
+.sectionActions .save {
+  padding: 3px 12px;
+  font-size: 12px;
+  line-height: 18px;
+}
+
+/* The 高级选项 disclosure toggle (plan fallbacks-card-section-ux T3): a
+   content-level control inside the h2 (the ARIA heading-with-button
+   pattern) — button chrome reset so the heading typography carries it. */
+.sectionToggle {
+  appearance: none;
+  border: 0;
+  background: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.sectionToggle:disabled {
+  cursor: default;
+}
+
+.sectionToggle:focus-visible {
+  outline: 2px solid var(--dsw-alias-brand-primary);
+  outline-offset: 1px;
+}
+
+/* The expanded 高级选项 body (plan fallbacks-card-section-ux T3): the
+   official field pacing re-scoped one level down — its fields are no
+   longer direct fieldset children, so the direct-child pacing rules above
+   get this twin (identical rhythm: 12px 0 fields, hairline separators
+   between adjacent fields). */
+.advancedBody {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.fieldset > .advancedBody > .field,
+.fieldset > .advancedBody > .checkboxRow,
+.fieldset > .advancedBody > .numberFields {
+  padding: 12px 0;
+}
+
+.fieldset > .advancedBody > .field + .field,
+.fieldset > .advancedBody > .checkboxRow + .field,
+.fieldset > .advancedBody > .field + .numberFields {
+  border-top: 0.5px solid var(--dsw-alias-border-l2);
+}
+
+/* Field grouping: label + hint + controls. `min-width: 0` keeps long option
+   rows from overflowing their grid/column. Base padding is 0 — nested
+   fields inside editor cards keep the tight card rhythm; the OFFICIAL flat
+   pacing (12px 0, hairline separators) is scoped to the fieldset's direct
+   children below. */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  min-width: 0;
+}
+
+/* Official flat field pacing (reference §3): 12px vertical padding,
+   0.5px hairline separator between ADJACENT fields (and into the paired
+   number grid). A section heading / notice between two fields breaks the
+   adjacency — the heading is the stronger break and carries no separator. */
+.fieldset > .field,
+.fieldset > .checkboxRow,
+.fieldset > .numberFields {
+  padding: 12px 0;
+}
+
+.fieldset > .field + .field,
+.fieldset > .field + .numberFields,
+.fieldset > .checkboxRow + .field {
+  border-top: 0.5px solid var(--dsw-alias-border-l2);
+}
+
+/* The roleAutoMatch row is the card's only .checkboxRow and lives inside
+   the expanded 高级选项 body (not a direct fieldset child — the pacing rules
+   above match it one level down): a flex row with the checkbox inline-LEFT
+   of its text, the optionRow convention. */
+.checkboxRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+/* Optical centering: the 16px box on the 22px title line. */
+.checkboxRow .checkbox {
+  margin-top: 3px;
+}
+
+.fieldLabel {
+  /* The official field-label form: 13px / weight 500 on the primary label
+     color; inline-flex with a 10px gap so the info-hint badge rides the
+     same baseline. */
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  font-weight: 500;
+  color: var(--dsw-alias-label-primary);
+}
+
+.hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+/* The enabled-row vocabulary lives on (the roleAutoMatch toggle): the
+   native checkbox sits inline-left (the row's first child) and this text
+   block rides to its right — both the title and the description are
+   `htmlFor` labels for the checkbox. */
+.checkLabel {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 14px;
+  line-height: 22px;
+  font-weight: 400;
+  color: var(--dsw-alias-label-primary);
+  cursor: pointer;
+}
+
+.checkLabelTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 400;
+}
+
+.checkLabelDesc {
+  font-size: 12px;
+  line-height: 18px;
+  font-weight: 400;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+/* The panel has no switch primitive, so the native checkbox keeps its
+   geometry and semantics; the 16px box and the brand accent tie it to the
+   theme (the advisor `.checkbox` convention), with the same focus-visible
+   ring. */
+.checkbox {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--dsw-alias-brand-primary);
+  cursor: pointer;
+}
+
+.checkbox:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* A preset time-slot row's frozen name (plan fallbacks-timeslots Task 3):
+   the row's read-only identity at field-label size on the primary tone —
+   stronger than the `.hint` window summary below it. */
+.slotPresetName {
+  font-size: 14px;
+  line-height: 22px;
+  font-weight: 500;
+  color: var(--dsw-alias-label-primary);
+}
+
+/* The "!" info badge (T3): a quiet circular mark on the tertiary tone whose
+   explanation rides the self-drawn CSS `data-tip` bubble (T4 — the
+   primitives Tooltip is gone). The bubble anchors to the RIGHT of the badge
+   (the original primitives side="right" contract), vertically centered, and
+   wraps at ~280px. The 16px geometry matches the checkbox/radio controls.
+   Focusable so keyboard users reach the same explanation; the focus-visible
+   ring mirrors the checkbox ring. */
+.infoHint {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--dsw-alias-label-tertiary);
+  background: var(--dsw-alias-interactive-bg-hover);
+  cursor: help;
+  user-select: none;
+}
+
+.infoHint:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--dsw-alias-border-l3);
+}
+
+.infoHint::after {
+  content: attr(data-tip);
+  position: absolute;
+  top: 50%;
+  left: calc(100% + 8px);
+  transform: translateY(-50%);
+  z-index: 10;
+  box-sizing: border-box;
+  width: max-content;
+  max-width: 280px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  background: var(--dsw-alias-label-primary);
+  color: var(--dsw-alias-bg-layer-3);
+  font-size: 11px;
+  line-height: 17px;
+  font-weight: 400;
+  white-space: normal;
+  text-align: left;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .12s;
+}
+
+.infoHint:hover::after,
+.infoHint:focus-visible::after {
+  opacity: 1;
+}
+
+/* Read-only/loading suppression: dimmed and out of the tab order; the
+   bubble is suppressed by the same `disabled` flag. */
+.infoHintDisabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* Checkbox/radio rows (trigger codes / revert policy): the Models fetch-list
+   candidate rows — flex gap 8, padding 6/8, pointer cursor, radius 6 — with
+   the composer option-row hover fill. `:has(input:not(:disabled))` keeps the
+   hover off a row whose own control is disabled. */
+.optionRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 14px;
+  line-height: 22px;
+  color: var(--dsw-alias-label-primary);
+  cursor: pointer;
+}
+
+.optionRow:hover:has(input:not(:disabled)) {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+/* Native checkbox/radio controls share the checkbox geometry: 16px box,
+   brand accent, same focus-visible ring. */
+.checkbox,
+.optionRow input {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--dsw-alias-brand-primary);
+  cursor: pointer;
+}
+
+.checkbox:focus-visible,
+.optionRow input:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--dsw-alias-border-l3);
+}
+
+.optionRow input:disabled {
+  cursor: default;
+}
+
+/* Custom time-slot day toggles (plan fallbacks-timeslots Task 3): seven
+   compact weekday chips sharing the option-row checkbox geometry — the
+   checkboxes keep the 16px box of `.optionRow input`, the chip text runs
+   at caption size. */
+.dayRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.dayCell {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-secondary);
+  cursor: pointer;
+}
+
+.dayCell:hover:has(input:not(:disabled)) {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.dayCell input {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--dsw-alias-brand-primary);
+  cursor: pointer;
+}
+
+.dayCell input:disabled {
+  cursor: default;
+}
+
+.dayCell input:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--dsw-alias-border-l3);
+}
+
+/* Text/enum fields — the official flat input: 34px, 0.5px l4 border, md
+   radius, 13px text on the layer-3 fill, business border on focus. */
+.input {
+  box-sizing: border-box;
+  width: 100%;
+  height: 34px;
+  padding: 0 12px;
+  border: 0.5px solid var(--dsw-alias-border-l4);
+  border-radius: var(--dsw-radius-md);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  background: var(--dsw-alias-bg-layer-3);
+  color: var(--dsw-alias-label-primary);
+}
+
+.input:focus-visible {
+  outline: none;
+  border-color: var(--dsw-alias-state-business-primary);
+}
+
+.input::placeholder {
+  color: var(--dsw-alias-label-dimmed);
+}
+
+.input:disabled {
+  color: var(--dsw-alias-label-tertiary);
+  cursor: default;
+}
+
+/* Multiline persona field: the same `.input` chrome, but the fixed 34px
+   height yields to an auto-sizing textarea with a vertical resize handle. */
+.inputTextarea {
+  height: auto;
+  min-height: 72px;
+  padding: 8px 12px;
+  resize: vertical;
+}
+
+/* Seeded persona brief (plan role-card-seeded-ux): a read-only single-line
+   summary at the input font scale — CSS ellipsis, never wrapping — with the
+   chevron toggle beside it disclosing the full multi-line text (client-local
+   state, not a settings write). */
+.personaBriefRow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.personaBrief {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  line-height: 22px;
+  color: var(--dsw-alias-label-primary);
+}
+
+/* Empty-persona fallback copy: the brief stays honest at the hint tone. */
+.personaBriefEmpty {
+  color: var(--dsw-alias-label-tertiary);
+}
+
+/* The expanded full persona text: multi-line reference copy — pre-wrap so
+   the authored line structure survives verbatim. */
+.personaFull {
+  margin: 0;
+  font-size: 14px;
+  line-height: 22px;
+  color: var(--dsw-alias-label-secondary);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Pre-save validation failure (role id format/reserved/duplicate): the
+   offending input keeps the error border even on focus — the business focus
+   border would otherwise mask the error state the user is trying to fix. */
+.inputInvalid,
+.inputInvalid:focus-visible {
+  border-color: var(--dsw-alias-state-error-primary);
+}
+
+/* Enum pickers hold a handful of short options; a field-width dropdown reads
+   as a text field the user is expected to fill. */
+select.input {
+  max-width: 240px;
+  cursor: pointer;
+}
+
+/* Select variant of .input: replaces the OS arrow (which sits flush against
+   the right edge) with the shared 12px chevron inset; the right pad
+   reserves its cell. */
+.selectInput {
+  appearance: none;
+  padding-right: 32px;
+  /* Data-URI SVGs cannot resolve CSS variables; #81858C is the caption gray
+     shared by both themes. */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none'%3E%3Cpath d='M3 4.5L6 7.5L9 4.5' stroke='%2381858C' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 12px 12px;
+}
+
+/* The three short numeric fields (cooldown / max switches / always cap) sit
+   side by side, each keeping a full-width field of its own grid column (the
+   advisor `.numberFields`); its own fields drop the field pacing (the grid
+   carries it). */
+.numberFields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+.numberFields .field {
+  padding: 0;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+/* Row editors (chains / role rules): a filled module on the page surface —
+   r12 on the module-platform fill. */
+.editorCard {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: var(--dsw-alias-bg-module-platform);
+}
+
+.cardFoot {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.ruleGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ruleCell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 120px;
+  flex: 1;
+}
+
+.ruleCellLabel {
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-secondary);
+}
+
+/* Disclosure chevron (CONTENT-level row/panel toggles only — the card-level
+   header chevron died with the chrome, T3). Standard disclosure convention:
+   COLLAPSED points right (the down-chevron glyph rotated -90deg), EXPANDED
+   points down (the glyph's natural rest state). */
+.chevron {
+  flex: none;
+  color: var(--dsw-alias-label-tertiary);
+  transform: rotate(-90deg);
+  transition: transform .16s;
+}
+
+.chevronOpen {
+  transform: none;
+}
+
+/* The move-up affordance flips the shared chevron (the dedicated up-icon is
+   gone with the primitives import). */
+.chevronFlip {
+  transform: rotate(180deg);
+}
+
+/* Collapsible row/panel headers (PR #62 feedback round; UX round 2): the
+   WHOLE first row is ONE header control — a full-width quiet button
+   (chevron + the collapsed summary: name/id + first model) — with a
+   separate drag handle beside it on the slot rows so click ≠ drag. */
+.collapseRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.collapseToggle {
+  appearance: none;
+  border: 0;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  color: var(--dsw-alias-label-secondary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  text-align: left;
+}
+
+.collapseToggle:disabled {
+  cursor: default;
+}
+
+.collapseTitle {
+  /* PR #62 UX round 4 part B: no flex:1 — the row tags hug the name
+     (flex:none + a max-width keeps the ellipsis for long custom names). */
+  flex: none;
+  max-width: 55%;
+  min-width: 0;
+  font-size: 12px;
+  line-height: 18px;
+  font-weight: 500;
+  color: var(--dsw-alias-label-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.collapseMeta {
+  /* PR #62 UX round 4 part B: the first-model meta sits at the FAR RIGHT
+     of the row (the tags no longer push it — they hug the name). */
+  flex: none;
+  margin-left: auto;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Source badge (plan role-card-seeded-ux): the provenance pill riding the
+   collapse title row — the quiet pill vocabulary (r999 fill, caption size)
+   at the layer-1 tone so it reads on the editorCard's module-platform
+   surface. Set names are case-preserved and length-uncapped server-side, so
+   the badge ellipsizes long names (never wraps) and the `title` attribute
+   carries the full label as a tooltip. Non-interactive: it rides the
+   whole-row collapse toggle hit area. */
+.seedBadge {
+  flex: none;
+  max-width: 40%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-size: 11px;
+  line-height: 17px;
+  font-weight: 500;
+  white-space: nowrap;
+  background: var(--dsw-alias-bg-layer-1);
+  color: var(--dsw-alias-label-secondary);
+}
+
+/* PR #62 UX round 4: compact non-interactive chips in the collapsed slot
+   title row — the cost/multiplier tags on the peak presets and the
+   active-slot indicator. PR #62 UX round 4 part B: restyled as
+   SEMI-TRANSPARENT OUTLINED PILLS — 1px border in the tone color + a
+   translucent tone fill (`color-mix`; the client targets modern evergreen
+   browsers) — light/dark adaptive through the same `--dsw-alias-state-*`
+   tokens the card's other badges use. */
+.slotTag {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0 6px;
+  font-size: 11px;
+  line-height: 17px;
+  font-weight: 500;
+  white-space: nowrap;
+  border: 1px solid;
+}
+
+.slotTagHighCost {
+  color: var(--dsw-alias-state-error-primary);
+  border-color: var(--dsw-alias-state-error-primary);
+  background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 10%, transparent);
+}
+
+.slotTagMultiplier {
+  color: var(--dsw-alias-state-warn-primary);
+  border-color: var(--dsw-alias-state-warn-primary);
+  background: color-mix(in srgb, var(--dsw-alias-state-warn-primary) 10%, transparent);
+}
+
+.slotTagActive {
+  color: var(--dsw-alias-state-success-primary);
+  border-color: var(--dsw-alias-state-success-primary);
+  background: color-mix(in srgb, var(--dsw-alias-state-success-primary) 10%, transparent);
+}
+
+/* The slot-row drag handle (PR #62 UX round 2): a quiet grip button beside
+   the collapse header — the ONLY draggable element of the row, so it works
+   while the row is collapsed AND a click on the header never starts a
+   drag. */
+.dragHandle {
+  appearance: none;
+  border: 0;
+  background: none;
+  padding: 0;
+  cursor: grab;
+  color: var(--dsw-alias-label-tertiary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  flex: none;
+}
+
+.dragHandle:hover:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
+
+.dragHandle:active {
+  cursor: grabbing;
+}
+
+.dragHandle:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+
+.dragHandle:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--dsw-alias-border-l3);
+}
+
+/* Drag-reorder (PR #62 feedback round): the dragged slot card dims, the
+   drop target gets a dashed brand outline. */
+.slotCardDragging {
+  opacity: 0.45;
+}
+
+.slotCardOver {
+  outline: 1px dashed var(--dsw-alias-brand-primary);
+  outline-offset: 2px;
+}
+
+/* Chain editor block (plan fallbacks-chain-row-compact T2): the selector rows
+   and their add affordance travel together, and the block owns its own 6px
+   pace — the editor card's 14px gap stays the card's, so the add button reads
+   as the chain's tail rather than as a separate field. */
+.chainBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Chain selector rows (provider select + model select): each entry is ONE
+   compact line, one row apart — the line owns the internal geometry, so the
+   list only carries the 4px between entries. */
+.chainSelectors {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* One chain entry on a single line: order index, provider select, model
+   select, any row-level hint, trailing remove icon. Never wraps — the cells
+   and the hint give width back instead of re-opening the row height. The
+   wrapper above it (`.selectorRow`, the reveal surface only — see the
+   hover/focus-within rules below) holds exactly this child, so it carries no
+   layout of its own: the line fills the row as a block-level flex container,
+   which is what the removed column-flex declarations already produced (T2-F1
+   cleanup, no geometry change). */
+.selectorLine {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap;
+  /* Floor for a row whose selects cannot render; the real height comes from
+     the 34px inputs. */
+  min-height: 32px;
+}
+
+/* The chain is ordered, and this aria-hidden ordinal is the only place the
+   order is expressed — right-aligned tabular digits keep 1…10 in one column. */
+.selectorIndex {
+  flex: none;
+  width: 1.5em;
+  text-align: right;
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--dsw-alias-label-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Provider holds short enum values, so it keeps a fixed-ish cell; the model
+   cell takes the remaining width and is the first to give it back. Both carry
+   `min-width: 0` so the nowrap line is always satisfied by shrinking the
+   selects instead of overflowing the card. */
+.selectorProviderCell {
+  flex: 0 1 clamp(140px, 20%, 220px);
+  min-width: 0;
+}
+
+.selectorModelCell {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* The model picker is the one enum that should take its cell: the global
+   `select.input { max-width: 240px }` cap belongs to the short enum fields,
+   but here the cell grows while the field stopped at 240px, so the row hint
+   and the remove control sat in the cell's dead tail (plan QC round G,
+   QC-S3). Scoped to THIS cell as `select.input` so the override wins on
+   specificity (0,2,1 against the global (0,1,1)) instead of relying on
+   source order — every other enum keeps the cap. */
+.selectorModelCell > select.input {
+  max-width: 100%;
+}
+
+/* Row-level hints ride the line instead of re-opening the row height. A hint
+   is a small flex strip, never a clipping box: the strip only positions the
+   trailing InfoHint badge next to the text, so nothing the badge needs is
+   ever clipped (T2-F2 — the badge used to sit inside the truncating span and
+   lost its trailing pixels at narrow widths). */
+.selectorHint {
+  display: flex;
+  align-items: center;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+/* The truncating TEXT holder of one row hint: one nowrap line, clipped with
+   an ellipsis, full copy on its own `title`. Keeping the clip here — and the
+   badge outside this element — is the whole contract: `overflow: hidden`
+   applies to the text alone, the sibling badge keeps its box. `min-width: 0`
+   lets the text give width back inside the row's nowrap line. */
+.selectorHintText {
+  flex: 0 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--dsw-alias-label-secondary);
+}
+
+/* The badge is a strip item that never shrinks: `flex: none` (re-declared
+   here so the hint strip's non-clipping contract does not depend on the
+   shared `.infoHint` base rule). */
+.selectorHint > .infoHint {
+  flex: none;
+  margin-left: 4px;
+}
+
+/* Row removal is a hover/focus affordance: the 28×28 `.iconButton` keeps its
+   own chrome and only gains the reveal, so the trash icon never competes with
+   the selects at rest. Touch devices have no hover, so the icon stays faintly
+   visible there. `flex: none` pins the fixed 28×28 box on the nowrap line (the
+   hint badge carries the same pin) so it cannot compress at narrow widths. */
+.selectorRemove {
+  flex: none;
+  opacity: 0;
+  transition: opacity .12s;
+}
+
+/* A non-writable row hides the remove affordance outright — the plan's
+   acceptance line ("remove … hidden when read-only"), not a dimmed control
+   that still looks actionable in a view that cannot save. The editor passes
+   `disabled` to the button, so this rule holds on the button's own attribute
+   instead of leaning on the ancestor `fieldset[disabled]`. */
+.selectorRemove:disabled {
+  display: none;
+}
+
+/* The reveal is restricted to an ENABLED control: it outranks
+   `.iconButton:disabled` on opacity, so without the `:not()` it would paint a
+   disabled button at full strength (the pre-fix read-only view). */
+.selectorRow:hover .selectorRemove:not(:disabled),
+.selectorRow:focus-within .selectorRemove:not(:disabled) {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .selectorRemove:not(:disabled) {
+    opacity: 0.7;
+  }
+}
+
+/* Icon-only actions: a 28×28 square with 6px radius on the Models
+   `.iconButton` geometry; the label rides `data-tip` (and aria-label) so the
+   card stays quiet until someone reaches for it. `position: relative`
+   anchors the kept data-tip tooltip above the button. */
+.iconButton {
+  position: relative;
+  box-sizing: border-box;
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--dsw-alias-label-tertiary);
+  cursor: pointer;
+}
+
+.iconButton:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.iconButton:hover:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
+
+.iconButton:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--dsw-alias-border-l3);
+}
+
+.iconButton::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: var(--dsw-alias-label-primary);
+  color: var(--dsw-alias-bg-layer-3);
+  font-size: 11px;
+  line-height: 17px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .12s;
+}
+
+.iconButton:hover::after,
+.iconButton:focus-visible::after {
+  opacity: 1;
+}
+
+/* Row removals are destructive: the danger tint on hover. */
+.iconButtonDanger:hover:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-hover-danger);
+  color: var(--dsw-alias-state-error-primary);
+}
+
+/* The self-drawn outline button (T4 — the primitives Button is gone): the
+   shared quiet outline used by the inline add affordances and the error-row
+   Retry. */
+.outlineButton {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: var(--dsw-radius-md);
+  background: none;
+  font: inherit;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-secondary);
+  cursor: pointer;
+}
+
+.outlineButton:hover:not(:disabled) {
+  color: var(--dsw-alias-label-primary);
+  border-color: var(--dsw-alias-label-dimmed);
+}
+
+.outlineButton:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.outlineButton:focus-visible {
+  outline: 2px solid var(--dsw-alias-brand-primary);
+  outline-offset: 1px;
+}
+
+/* The inline add affordances align to the field's start edge rather than
+   stretching across it. */
+.addButton {
+  align-self: flex-start;
+}
+
+/* The chain's add affordance is a ghost row at the chain tail (plan
+   fallbacks-chain-row-compact T2). `.outlineButton` / `.addButton` keep their
+   declarations for the other sections, so the override is scoped to the chain
+   block: 26px tall on the same 1px border the bordered variant carries (kept
+   transparent), so the box does not jump when the hover fill appears. */
+.chainBlock > .addButton {
+  box-sizing: border-box;
+  align-self: flex-start;
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  gap: 4px;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.chainBlock > .addButton:hover:not(:disabled) {
+  border-color: transparent;
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
+
+/* The ghost keeps the quiet ring of `.iconButton` rather than the bordered
+   button's brand outline. */
+.chainBlock > .addButton:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--dsw-alias-border-l3);
+}
+
+/* The time-slot add row (preset picker + Add preset + Add custom): the
+   picker keeps the enum-select width (max 240px), the two buttons trail it —
+   the row never stretches across the field. */
+.slotAddRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+
+/* Time-slot row actions (move up / move down / remove): icon buttons in a
+   tight cluster, right-aligned via the editorCard's `.cardFoot`. */
+.rowActions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Discard (secondary outline) + Save (dark solid primary) — the official
+   SettingsForm action pair, re-homed beside each section heading (plan
+   fallbacks-card-section-ux T2; the flat footer is gone). Sized by
+   `.sectionActions`. */
+.discard,
+.save {
+  appearance: none;
+  border: 1px solid transparent;
+  border-radius: var(--dsw-radius-md);
+  padding: 5px 14px;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  cursor: pointer;
+}
+
+.discard {
+  border-color: var(--dsw-alias-border-l2);
+  background: none;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.discard:hover:not(:disabled) {
+  color: var(--dsw-alias-label-primary);
+  border-color: var(--dsw-alias-label-dimmed);
+}
+
+.save {
+  background: var(--dsw-alias-label-primary);
+  color: var(--dsw-alias-bg-layer-3);
+}
+
+.discard:disabled,
+.save:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.discard:focus-visible,
+.save:focus-visible {
+  outline: 2px solid var(--dsw-alias-brand-primary);
+  outline-offset: 1px;
+}
+
+/* AC-7 read-only status, compact: an outlined card like the Models rows
+   (`.rowCard`: padding 12/14, gap 12), flat at the bottom. One line per fact
+   with ellipsis overflow — the block never dominates the card. */
+.statusBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 14px;
+  margin-top: 12px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 12px;
+}
+
+.statusTitle {
+  font-size: 12px;
+  line-height: 18px;
+  font-weight: 500;
+  color: var(--dsw-alias-label-secondary);
+}
+
+/* One status fact (recent switches): secondary tone, a single line,
+   ellipsis overflow when the content outgrows the card. */
+.statusLine {
+  margin: 0;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.statusLineLabel {
+  font-weight: 500;
+  color: var(--dsw-alias-label-secondary);
+}
+
+/* Read-only host-policy status (spec D4 / T5) under the 子代理 heading.
+   Quiet filled box matching `.legacyNotice` — informational, not a second
+   write-face. Warn-tone line uses the same `--dsw-alias-state-warn-*` token
+   as the conversation switch row. */
+.policyStatus {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-module-platform);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.policyStatusLabel {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.policyStatusLine {
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-primary);
+}
+
+.policyStatusWarn {
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-state-warn-primary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .iconButton::after,
+  .infoHint::after {
+    transition: none;
+  }
+
+  .chevron {
+    transition: none;
+  }
+}

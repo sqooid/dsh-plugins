@@ -1,0 +1,429 @@
+# Changelog
+
+<!-- release v0.1.0-alpha.2 -->
+
+All notable changes to this project are documented in this file.
+
+## [Unreleased]
+
+## [0.6.8] - 2026-10-20
+
+### Changed
+
+- Fallback-chain selector rows are now single compact lines: each entry shows its 1-based order index, the provider select, the model select and a trailing delete button instead of a labelled multi-row block.
+- The delete button is revealed on row hover or keyboard focus (and stays reachable on touch devices) instead of occupying its own footer row; it is hidden entirely on rows the read-only view cannot edit.
+- The "add selector" affordance sits inline at the tail of each chain block, directly under the last entry.
+- Row hints (wildcard conversion, outside-catalog and "no models available") now render inline on the row line and ellipsise instead of pushing the row taller; the full text stays available on hover, and the "no models available" hint is bound to the model select for assistive tech (its visible inline text is the guaranteed channel).
+- The chain selects are announced by position ("Selector 1 provider", "Selector 2 model", "Remove selector 2") so every row of a chain is distinguishable to screen readers.
+- README and `docs/install.md` now lead the install section with the Desktop / Web plugin-page path (Plugins page → Add plugin), followed by the `dsh plugin --profile …` CLI path.
+- Documented that a GUI install targets the same `web` profile as `dsh plugin --profile web add`, while the `dsh-tui` terminal profile stays CLI-only.
+
+## [0.6.7] - 2026-10-18
+
+### Added
+
+- The `llm-fallbacks` service grows one additive read-only method: `getAgentRole(agentId)` returns the DECLARED RAW role id a live subagent was dispatched as (trimming preserved), readable from the moment of dispatch — before the child's first step and for its whole activation lifetime — and `null` whenever no dispatch role resolved for that id.
+- `ROLE_PROJECTION_KEY` and `readRoleProjectionValue` are now re-exported from the package root, so a companion reads the durable `fallbacksSubagentRole` session projection without hard-coding the key literal or re-implementing the blank-string guard.
+
+### Changed
+
+- The role a dispatch declares (`**Execute as**: <id>` in the child's prompt) is now an explicit stage of dispatch-time role resolution, so a declared role's chain head drives the child's first request — including an Agent Team teammate's initial spawn prompt.
+- Agent Team teammates get their persona, role notice/badge and chain-head model from that same header; teammate names stay arbitrary, several teammates may share one role, and an external provider still delivers no persona, notice or badge.
+- Restructured the README around three core capabilities (automatic model failover, peak/valley time slots, role-based subagents) and moved the reference detail into the new `docs/features.md` and `docs/repair.md`.
+- Documented that the role-based subagent pillar covers both ordinary dispatch and Agent Team teammates through the same `**Execute as**: <id>` dispatch header.
+
+### Fixed
+
+- `pnpm repair:session-logs` works against the dsh 0.2.1-rc.2 session-format catalog again: a pre-V3 log is repaired and published as its V3 repair-floor generation through the catalog's own `historicalSessionFormatCatalog`, and the host migrates that generation onward to the installed V4 format with its own historical child evidence. Previously every `--apply` publication and every catalog classification of a pre-V3 log failed with `V3 catalog migration requires explicit historical child facts`, because the newer catalog's V3→V4 edge needs corpus-level child evidence a single-log repair cannot supply.
+- The resolved catalog's repair floor is now validated and reported: a newer build without a usable `historicalSessionFormatCatalog` is refused up front (exit 2), and the text/`--json` report names both the installed `currentVersion` and the `repairVersion` successors are published at.
+
+## [0.6.6] - 2026-10-17
+
+### Fixed
+
+- Adapt the subagent dispatch seam to the installed `@deepseek-ai/dsh-subagent` activation API (`startActivation` in place of the removed `start` / `startContinuable`), so role resolution, the in-session `[role: <id>]` notice row and the session-header role badge keep working with the dsh peer range declared in `package.json`.
+- Deliver the resolved role persona as a scoped `deployment:persona-prefix` system-prompt section on the child instead of a request persona: it still replaces the deployment persona for that dispatched child, but it is no longer durable — a role child resumed after a host restart now runs without its role persona.
+
+### Changed
+
+- Upgrade `@deepseek-ai/dsh-*` peer dependencies to `^0.2.1-rc.1` (corridor `dsh-v0.2.1-alpha.5` → `dsh-v0.2.1-rc.1`, rolled up from `0.2.0-rc.2`) and refresh the lockfile, pnpm-workspace exemptions/patches, docs pins, and README dsh badge for the new cohort.
+- Upgrade `@deepseek-ai/dsh-*` peer dependencies to `^0.2.1-rc.2` (corridor `dsh-v0.2.1-rc.1` → `dsh-v0.2.1-rc.2`: DeepSeek Search/Fetch web-search settings UI; Flash-1017 temporary model-label badge; cohort pin) and refresh the lockfile and README dsh badge.
+<!-- CN -->
+- 将 `@deepseek-ai/dsh-*` peer 依赖升级到 `^0.2.1-rc.2`（走廊 `dsh-v0.2.1-rc.1` → `dsh-v0.2.1-rc.2`：DeepSeek Search/Fetch Web Search 设置 UI；Flash-1017 临时候选标徽章；RC 钉死），并刷新 lockfile 与 README dsh 徽章。
+
+## [0.6.5] - 2026-09-29
+
+### Changed
+
+- Upgrade `@deepseek-ai/dsh-*` peer dependencies to `^0.2.0-rc.2` (corridor `dsh-v0.2.0-rc.1` → `dsh-v0.2.0-rc.2`; deferred until npm published 0.2.0-rc.2) and refresh the lockfile, pnpm-workspace exemptions/patches, docs pins, and README dsh badge for the new cohort.
+
+## [0.6.4] - 2026-09-28
+
+### Changed
+
+- Disclosure chevrons on the Fallbacks card now point right when collapsed and down when expanded (advanced options and the time-slot, role and persona row disclosures).
+- The role automatch checkbox moved inline-left of its label with the whole text row clickable — it had slipped below the text inside the collapsed-options body.
+- Section headings (main agent / subagents / advanced options) are enlarged to 16px.
+- Upgrade `@deepseek-ai/dsh-*` peer dependencies to `^0.2.0-rc.1` (corridor `dsh-v0.1.7-rc.2` → `dsh-v0.2.0-rc.1`) and refresh the lockfile, pnpm-workspace exemptions/patches, docs pins, and README dsh badge for the new cohort.
+
+## [0.6.3] - 2026-09-27
+
+### Changed
+
+- The Fallbacks card gives each section (main agent / subagents / advanced options) its own Discard and Save beside the heading again; a section save writes only that section's fields over the last accepted config, and the single bottom save is removed.
+- Section titles are semantic `h2` headings, and the advanced options section is collapsed by default behind an accessible disclosure toggle (forced open in read-only views).
+- The cooldown, per-step switch cap, and always-mode retry cap default values moved into each field's info tooltip, so the label rows no longer wrap.
+
+## [0.6.2] - 2026-09-27
+
+### Changed
+
+- Rebuilt the web settings card in the official Plugins-page flat form language: the card is always open with no collapsible chrome and no feature switch, all fields render unconditionally under flat section headings (主代理 / 子代理 / 高级选项), and ONE footer Save/Discard pair replaces the per-section saves — Save writes the whole validated draft (Discard is kept; staged edits survive refresh). Self-drawn buttons, icons, and tooltips replace the `@deepseek-ai/dsh-client-ui-primitives` dependency, which is dropped from the client bundle and from `peerDependencies`.
+
+### Added
+
+- Added localized plugin metadata and an icon: package-root `locale/en.json` / `locale/zh.json` (title "Fallbacks" / "故障降级" plus a one-line description) and a package `icon.svg` in the official gradient-tile style, declared through `package.json` (`icon`, `exports["./locale/*.json"]`, `files`) so the Plugins-page detail view and component row localize automatically.
+
+### Removed
+
+- Removed the config-level `enabled` switch (breaking): the Plugins-page row toggle is the master switch, and the runtime no-op gate re-keys to content presence — an empty configuration (no chains, time slots, or roles) behaves exactly like an uninstalled plugin. Stored profiles still carrying `enabled: true/false` load cleanly; the key is silently stripped from snapshots and saves and never re-persisted.
+
+## [0.6.1] - 2026-09-24
+
+### Changed
+
+- Declare dsh 0.1.7-rc.2 compatibility: peer dependencies bump from `^0.1.7-rc.1` to `^0.1.7-rc.2`. No runtime change was required — the corridor's LLM provider reorganization (`resolveAuth`), the new `ACCOUNT_QUOTA` error code, and the tightened model-catalog semantics leave the plugin's seams untouched, and the plugin's live-config-reference unwrap already covers the schemastery ≥3.18.4 volatile semantics the rc.2 settings stack resolves against.
+- Dev-time installs patch an upstream packaging gap via a pnpm `packageExtensions` entry: the published `dsh-client-ui-primitives@0.1.7-rc.2` bare-imports `dsh-util-code-language` without declaring it in its manifest (the host box resolves it from its own package set; registry-mode dev installs would fail the vitest graph). Remove the entry once an upstream release declares the dependency.
+
+## [0.6.0] - 2026-09-24
+
+### Changed
+
+- Mount the Fallbacks settings card on the Plugins page `plugins.bundle.config` keyed slot (key `dsh-llm-fallbacks`, the bundle package name) via `dsh-client-ui-plugin-manager`, replacing the removed `settings.plugin.item` settings-page slot.
+- Serve the official Pro all-day tail as `deepseek-official/deepseek-v4-pro` (catalog-served since dsh 0.1.7-rc.1) and make the settings card's Pro radio selectable again.
+- Read hand-written legacy `deepseek-official/deepseek-pro` tails back as non-conforming (one startup warn, inert slot rows, unselected in the card) — no migration; re-pick the tail.
+- Upgrade the `@deepseek-ai/dsh-*` peer range to `^0.1.7-rc.1` and adapt to the 0.1.7-rc.1 APIs: the `fallbacks` settings section is the Loader entry Config now (volatile schema; the retired `SettingsProvider.installSection` registration is gone), settings writes target the plugin's profile entry `llm-fallbacks` through the `SettingsForms` form service, the role notice writes the producer-declared `llm-fallbacks-role-notice` source kind (the shared `plugin` kind was removed; pre-upgrade `plugin:dsh-llm-fallbacks` rows keep their badge), and the card icons follow the renamed `*OutlineMedium` ui-primitives exports.
+
+## [0.5.2] - 2026-09-11
+
+### Changed
+
+- The session-header subagent role badge now renders next to the session's agent-preset (mode) chip instead of the far-right utilities area of the header.
+
+## [0.5.1] - 2026-09-11
+
+### Fixed
+
+- `pnpm repair:session-logs` no longer dies with an unhandled `EPIPE` stack trace when the consumer stops reading the report (the ordinary `… | head -n 5`): it stops writing to that stream, still completes the run — an `--apply` pass publishes every remaining successor — and exits with the store's own exit code, which `--help` and the README exit-code section now document (a stream error that is not a closed pipe is still surfaced, never swallowed).
+
+### Added
+
+- A subagent's resolved role is now its identity, not only a routing decision: the declared role's persona is installed on the child itself for every resolved role, including roles with no model chain (a caller-set persona still wins).
+- The resolved role is announced once inside the subagent's own session as a durable plugin notice row naming the role.
+- The role badge next to the session title now reads the child's own session record, so the role stays visible for a settled subagent session and after a host restart. Its source is narrower than before: the badge reports the role DECLARED in the child's Assignment header (`**Execute as**: <id>`), so a child whose role came only from an `agentPreset` match, a role rule or the LLM auto-match is still routed as that role but shows no badge.
+
+## [0.5.0] - 2026-09-10
+
+### Fixed
+
+- With `FallbacksChain` / `Auto` selected, the host's model-change notice is no longer re-armed on every step: the root request is now served and recorded as the virtual pair (the `agent/request` rewrite to the chain head is removed) and the virtual adapter's delegate dispatches the effective head, so the durable `request/header` matches the session selection and the notice appears once on a genuine model change instead of continuously.
+- `llm-deepseek.retryPolicy` — including `mode: 'always'` — now applies on the virtual route: the adapter reports the effective head's policy instead of the permissive default (the host captures that policy once at registration, so a later policy edit or a slot-driven head-provider rotation takes effect only after re-registration).
+- `alwaysModeRetryCap` now trips on the virtual route; it was unreachable there because the removed rewrite always returned the chain head before the cap check.
+- Half-open recovery works on the virtual route: a served completion now closes the head's circuit (the success observer had keyed on the virtual pair while failures keyed on the served head, so the circuit could never close and its suppression kept escalating despite successful requests).
+- Subagent role rules keep matching on the virtual route: a rule keyed on the real chain head still resolves for a delegated child whose recorded route is the virtual row (dispatch-time rule matching now accepts either **whole** pair — the recorded one or the served one — so a rule that crosses the two, e.g. the virtual provider with the head's model, no longer matches).
+- Localize the fixed external source badge while preserving registered set names verbatim, including their case.
+- Keep seed declarations isolated per producer so the plugin's bundled presets retain their bundled source and seeded state when a companion re-declares them, instead of appearing as external roles.
+- Keep seeded persona text inside the settings card: it ellipsizes when collapsed and wraps when expanded, without widening the settings panel.
+- Replaying a pi-ai-backed head on the `FallbacksChain` / `Auto` route no longer drops that adapter's replay envelope for history **recorded on the virtual route**: that history is re-stamped to the provider/model its own envelope names, so thinking/thought signatures and redacted reasoning blocks survive instead of degrading to a provider-neutral transcript.
+- History recorded on a **real** provider route still loses its replay envelope in a virtual-route session — the request route is the virtual pair, so the runtime's ownership pass strips it before the delegate runs — and that half cannot be closed from the plugin.
+
+### Changed
+
+- `pnpm repair:session-logs` replaces the retired session-log detector: it is a read-only report by default — classifying every pre-V3 session log and printing per-class counts — and publishes a repaired successor generation only with `--apply` (the old `--dry-run` flag no longer exists, since report mode is the default).
+- Session logs blocked by legacy `fallbacks/switch` rows can be recovered with the opt-in lossy `--drop-legacy-events` mode (which requires `--backup` together with `--apply`): it removes those switch-audit rows, renumbers the surviving events, reports the dropped and renumbered event counts, and fails closed with nothing written when a surviving reference names a dropped seq.
+- The report distinguishes the two loader policies: a session that opens with rows silently dropped under the host loader's lenient policy is now reported `ok-truncated` (with a `strictRefusal` reason in `--json` and an `ok-truncated` summary count) instead of a clean `ok`.
+- Discovery never fails open: unreadable directories are reported with their errno, symlinked and irregular entries are reported rather than followed, and a stranded `session.repair.*.jsonl.zstd.tmp` is reported as stale staging. Each of these is printed in both report modes, suppresses the "no session log …" line and makes the run exit 1, while an unreadable `--root` is fatal (exit 2).
+- `--apply` refuses to publish a revision it did not decode: the digest of the bytes that were read is checked before anything is staged, and the report says whether a successor was `created` or an identical pre-existing one was `accepted`. A successor left behind by a stale snapshot is named for rollback instead of being reported as "nothing was published".
+- The released catalog is pinned to a release: a catalog below the required format version is refused (exit 2), the report names the catalog package version, and the catalog owned by the running `dsh` is preferred.
+
+## [0.4.4] - 2026-09-10
+
+### Changed
+
+- Retarget the all-day `rootChain` tail set to the renamed official line: exactly one of `deepseek-official/deepseek-flash` or `deepseek-official/deepseek-pro` (XOR). The retired `deepseek-v4-flash` / `deepseek-v4-pro` ids are no longer legal tails — a saved V4 tail now warns at startup, keeps slot rows and the virtual picker inert, and blocks save until a legal tail is picked. `deepseek-pro` is a legal selector whose model is not yet served by the catalog: the settings card shows it disabled ("not yet available"), and requests to it fail at the provider until the gateway enables the id. The plugin does not probe catalog availability — a chain containing `deepseek-pro` dispatches to it like any other exact entry, and the override resolves the first exact head of the effective chain, so a chain with a working entry before Pro still routes to that earlier entry.
+- Add `CODE_OF_CONDUCT.md`, `CONTRIBUTING.md`, and `SECURITY.md` at the repository root.
+- Upgrade every `@deepseek-ai/dsh-*` peer dependency to `^0.1.5-rc.1` (dsh 0.1.5-rc.1, corridor from 0.1.2-rc.1 through 0.1.3/0.1.5 alphas). Conversation seats (`conversation.chat.node` / `conversation.session.header.utilities`) unchanged — not a top-level panel Slot migrate. Add host-externalized transitive runtime deps of `dsh-client-ui-primitives` / `dsh-client-store` (`clsx`, `zustand`, `immer`, shiki/micromark stack) as `devDependencies` so the out-of-tree vitest graph still resolves after those packages moved them out of `dependencies`.
+
+### Fixed
+
+- `scripts/repair-fallbacks-switch-logs.ts` now fails closed: the released session-format migration chain (v0→v1) refuses unknown event types even when marked `ignorable`, so a "repaired" log would still be rejected on load — the script no longer reports or writes such logs and exits non-zero instead (the durable fix belongs upstream at the migration edges).
+
+## [0.4.3] - 2026-09-10
+
+### Added
+
+- `triggerCodes` accepts `CONTEXT_WINDOW_EXCEEDED`: a request too big for the current model fails over to the next candidate, and because the route itself is healthy the switch is request-scoped — the from-route is recorded as failed for the step and counts against `maxSwitchesPerStep`, but is not put on cooldown and does not feed the half-open recovery counter (every other trigger code stays route-scoped, unchanged).
+- Context-window walks skip candidates whose advertised context window is not larger than the failing model's; skipped candidates are named `skipped: context-window` in the switch log, and a model that discloses no window either way is kept as a candidate.
+- `declareSeeds` accepts an optional second argument `{ set: '<name>' }` that labels the whole seed batch with a registered provenance set name; an empty, non-string, or reserved name (`bundled` / `user` / `external`) warns once and degrades to the unnamed `external` label — the seeds still apply.
+- Every seed readback and gateway `seeds` wire entry now carries a per-row `source` (`bundled`, the declared set name, `external`, or `user`), derived at read time from the live declaration registries and never persisted.
+- Rows without a live declaration — including `designer` / `librarian` rows persisted by earlier versions before the preset trim — show source `user` even though the operator never wrote them; the label means "no live declaration", not "operator-written".
+- Subagent sessions whose dispatch resolved a non-`inherit` role show a compact role badge next to the session title in the web session header; hovering shows `role → provider/model` — the effective route after any override/inject.
+- The badge covers both policy-on and policy-off dispatches; `inherit`/unresolved sessions render no badge, records live only for the host process lifetime, and the `role → model` info logs stay the durable record.
+- A session header opened before the subagent's first dispatch completes re-probes the readback briefly (~10s), so the badge appears as soon as the role record lands — no re-navigation or reload needed.
+
+### Fixed
+
+- The named `llm-fallbacks` service is now provided from inside the plugin's settings inject child — the seed write channel binds first, then the service is provided in the same callback — so service visibility implies `declareSeeds` can write. A companion declaring seeds the moment the service appears (the documented declare-on-probe pattern) no longer rejects with `settings service is unavailable` (issue #105); the first declare persists roles, with no retry needed.
+- Observable timing change: the service appears only after the settings child settles (never synchronously during `apply()`), unregisters when the settings service goes away (settings teardown or plugin dispose), returns when settings re-appear, and never appears without a settings service; a second plugin fiber applying inside the one-tick claim window degrades via its dedupe catches instead of failing.
+- The seeded persona expand chevron stays operable in a read-only view: it is no longer a native button, so the disabled form fieldset cannot grey it out and the full multi-line persona remains reachable when role rows are forced open.
+
+### Changed
+
+- The settings card renders seeded role rows as read-only reference material: no id input (the row title carries the name), the persona shows as a single-line brief with an expandable full view instead of a persona editor, and the persona revert button is gone; chain and fallback editors and the remove action are unchanged, and unseeded rows keep the full editing UI.
+- Every role row shows a source badge — `bundled` for the plugin's own presets, the declared set name (or `external` when the batch is unnamed) for companion-declared rows, and `User` otherwise; rows kept from the removed `designer` / `librarian` presets show `User` even though the operator never wrote them (the label means "no live declaration", not "operator-written").
+- A blank or missing wire `source` renders no badge — the version-skew degrade, not an error.
+- The bundled preset set shrinks from 7 to 5 roles: `designer` and `librarian` are no longer auto-declared on apply. Rows saved by earlier versions keep their persona and survive untouched, but they now show source `user` — even though the operator never wrote those rows — as ordinary editable rows.
+
+## [0.4.2] - 2026-09-08
+
+### Fixed
+
+- `recovery: 'half-open'`: a completion observed after a route's cooldown lapsed now closes the circuit even when no decision-path read had transitioned the route to half-open yet (a manual re-selection, or a route no failure walk consulted because the current route kept succeeding). Previously the entry survived with its failure counter, so `/fallbacks` showed a spurious half-open marker for a route that was serving and the route's next failure escalated from n + 1 despite the proven recovery. Completions observed while a cooldown is still active are ignored exactly as before.
+
+## [0.4.1] - 2026-09-03
+
+### Fixed
+
+- Web settings surfaces no longer throw `cannot get property "remote.settings" without inject` on dsh 0.1.2-rc.1 (the client now declares the dotted `remote.llm` / `remote.settings` / `remote.session` namespace injects).
+
+## [0.4.0] - 2026-09-03
+
+### Changed
+
+- Prereleases now publish to npm under their channel dist-tag (e.g. `alpha`) instead of `latest`; `latest` stays on the newest stable release.
+- Install a prerelease line via its channel tag, e.g. `npm i dsh-llm-fallbacks@alpha`.
+- Upgrade every `@deepseek-ai/dsh-*` peer dependency to `^0.1.2-alpha.3` (dsh 0.1.2-alpha.3, 2026-08-31). Continuable subagent follow-up/steer now admits images; no source migration required beyond the peer/lock bump (already on alpha.2 APIs).
+- Upgrade every `@deepseek-ai/dsh-*` peer dependency to `^0.1.2-alpha.4` (dsh 0.1.2-alpha.4, 2026-09-01). Migrate `Session.events` reads to `Session.snapshotEvents()` (Session no longer exposes the events array; session logs are read on demand via `snapshotEvents()`/`eventAt()`).
+- Upgrade every `@deepseek-ai/dsh-*` peer dependency to `^0.1.2-alpha.5` (dsh 0.1.2-alpha.5, 2026-09-02). Storage version read-compat and backup-and-skip salvage are host-internal; no source migration required beyond the peer/lock bump.
+- Upgrade every `@deepseek-ai/dsh-*` peer dependency to `^0.1.2-rc.1` (dsh 0.1.2-rc.1, 2026-09-03). No source migration required beyond the peer/lock bump.
+
+## [0.4.0-alpha.1] - 2026-08-30
+
+### Changed
+
+- Migrate the client half off the removed `@deepseek-ai/dsh-client-runtime` (deleted upstream in dsh 0.1.2) onto its 0.1.2 successor seams: the snapshot store VALUE-imports `@deepseek-ai/dsh-client-store`, session/context types come from `@deepseek-ai/dsh-api-session-controller/client` and cordis `Context`, conversation/chat slot types from `@deepseek-ai/dsh-client-ui-conversation/client` / `@deepseek-ai/dsh-client-ui-chat/client`, and the view types dropped by the 0.1.2 `dsh-client-connection/client` entry re-home to the api-remotes client barrel and session-controller client. Peers are re-pinned `^0.1.2-alpha.1` with the dead `dsh-client-runtime` peer removed; the plugin's own export surface (`.` and `./client`) is unchanged.
+- Align the client bundle composition with the 0.1.2 platform table: the former runtime entry in `CLIENT_EXTERNALS` becomes `@deepseek-ai/dsh-client-store` (the frozen loader-table store module the store VALUE import resolves from at runtime), and the `dsh.client.inject` list keeps only the client-plugin service graph (no store/runtime inject entry).
+- Adopt the 0.1.2 `imageRequestPricing` hook on the virtual chain adapter: image token metering on the fallback chain now resolves the SAME effective head `stream()` dispatches and delegates to that concrete route's adapter, so pricing is route-accurate instead of keyed off the virtual `provider`/`model` row (which carries no pricing of its own).
+- Unresolvable routes degrade safely: an unresolvable chain head, a vanished LLM runtime, or a throwing delegate returns `undefined`, so the token meter falls back to its neutral estimate and the hook never throws.
+- Upgrade every `@deepseek-ai/dsh-*` peer dependency (plus `@deepseek-ai/cordis` `^4.0.2` and `@deepseek-ai/schemastery` `^3.18.2`) to the published `^0.1.2-alpha.2` line (dsh 0.1.2-alpha.2, 2026-08-30; the alpha.1 line was never published). The settings section now registers through `SettingsProvider.installSection` (the 0.1.2 successor of the removed `installSettingsSection`/`settingsNamespace` helpers), and the always-mode retry cap counts the `llm/retry` events whose `SessionEventMap` vocabulary ships in `@deepseek-ai/dsh-llm-retry`.
+
+### Added
+
+- Reconcile with the dsh 0.1.2 host subagent model-selection policy under one runtime arbiter: when the host policy is enabled (session `subagent/model-selection-policy` event, else the `subagent-model-selection` settings allowlist), an explicit authorized spawn route is preserved as the chain head (role-inject skipped), inheritance role-inject heads and failure-switch targets are intersected with the effective allowlist, and an empty intersection skips the inject/switch with a warn log and an in-memory blocked-attempt record — no out-of-allowlist plugin-originated route is ever sent; a present-but-malformed policy fails closed (plugin injects/switches disabled, host seed stands). Policy disabled/absent keeps 0.3.5 inject/switch selection unchanged.
+- The Fallbacks card Subagents section gains a read-only host-policy status area: effective allowlist routes, effective chain head with its `authorized` / `injected` source label, and an empty-intersection warning when a switch was blocked — hidden when the policy is off, and never a second write-face.
+- `reasoningEffort` on override paths now follows the upstream routeChanged rule (policy-independent): an unchanged provider/model route keeps the seed effort, a route change without an explicit effort drops it (a stale effort is never carried into a different provider), and an effort explicitly named for the override always survives.
+
+## [0.3.5] - 2026-08-26
+
+### Added
+
+- Add opt-in half-open recovery (`fallbacks.recovery: 'half-open'`): an expired cooldown leaves the route half-open for one logged probe instead of restoring the preferred candidate; consecutive failures escalate the suppression duration (×2 per failure, capped at 1 h); an observed completion closes the circuit and fully restores the preference. `revertPolicy: 'never'` keeps the mechanism inert; state is session-scoped in-memory. YAML-only — the default `'timer'` keeps every existing behavior byte-identical.
+- Startup warn when `recovery: 'half-open'` is combined with `cooldownMs` at or above the 1-hour escalation cap: escalation is inert (every suppression stays flat at `cooldownMs`), and the config validator now says so at startup.
+
+## [0.3.4] - 2026-08-23
+
+### Changed
+
+- Liang Peak (`liang-peak`) now applies only Monday–Friday 09:00–12:00 and 14:00–18:00 UTC+8; weekends fall through to Liang Valley / the all-day chain.
+- Upgrade every `@deepseek-ai/dsh-*` peer dependency to `^0.1.1-rc.2` (dsh 0.1.1-rc.2, 2026-08-21); no breaking seam consumed by this plugin changed, so no source migration was required.
+
+## [0.3.3] - 2026-08-21
+
+### Fixed
+
+- Register the `settings.plugin.item` card with `id` alongside `key` so it mounts on dsh hosts that still declare the slot as a list (pre-rc.7) instead of failing with `list slot "settings.plugin.item" requires options.id`.
+
+### Changed
+
+- Upgrade every `@deepseek-ai/dsh-*` peer dependency to `^0.1.1-rc.1` (dsh 0.1.1-rc.1, 2026-08-21); no breaking seam consumed by this plugin changed, so no source migration was required.
+
+## [0.3.2] - 2026-08-20
+
+### Added
+
+- Add a `/settings` write surface for llm-fallbacks in dsh-tui profiles: the fallbacks section edits every web settings-card capability (JSON text fields for complex config), with full parity to the web card. Requires dsh-tui >= v0.8.5 (commit `c51661f`).
+- Add `/fallbacks config revert-seed <role-id>` (restores a seeded role's persona) and enrich the `/fallbacks config` readback with time slots, timezone, and role rules.
+
+### Fixed
+
+- Support selectors whose model id contains `/` (e.g. NVIDIA NIM `nvidia/minimaxai/minimax-m3`), previously rejected as an "extra separator".
+
+## [0.3.1] - 2026-08-20
+
+### Changed
+
+- The English README uses the plugin's English UI labels only (Main agent, Time slots, Default model, Default fallback chain, time-slot switch / fallback switch) and no longer mixes Chinese terms. The language switcher keeps the `[中文]` label as the sole Chinese in that file.
+- Upgrade every `@deepseek-ai/dsh-*` peer dependency to `^0.1.0-rc.8` (dsh 0.1.0-rc.8, 2026-08-19).
+- Replace the deleted `@deepseek-ai/dsh-client-web-react` dependency: the uSES snapshot bind is vendored in the client half (`src/client/use-snapshot.ts`, same contract as rc.7) and `SnapshotSelectorHook` is imported from `@deepseek-ai/dsh-client-ui-slots`; the client bundle's loader-table externals follow the rc.8 platform table.
+- Add `use-sync-external-store` as a runtime dependency for the vendored snapshot hook.
+
+## [0.3.0] - 2026-08-18
+
+### Changed
+
+- README now features the time-slot model (分时切换): peak/valley preset windows (Liang Peak / Liang Valley / GLM Peak / GLM Valley) and custom slots each carry their own fallback chain, the first matching row wins, and the all-day chain stays as the last resort with an official V4 tail (Flash XOR Pro). The English README introduces the feature as Time slots with a language-matched screenshot; the Chinese README leads with the 峰谷无忧 name; docs/configuration.md names the same model in its Time slots section.
+- The all-day `rootChain` now ends with the default model (official V4 Flash or Pro) as the last-resort fallback; the default fallback chain is walked first. Card copy, save validation, and the gateway match this order (UI top-to-bottom = walk order).
+- Settings card: the new 主代理 section groups 分时槽设置 (slot rows + an in-section timezone picker that locks to Asia/Shanghai while any preset row exists; rows are drag-reorderable and collapsible to name + first model; custom rows carry an editable name), 默认降级链 (the all-day chain as a configurable provider/model selector list — the old preemption hints are removed) and 默认模型 (the official V4 Flash | Pro head panel); zh preset labels are 梁文峰 / 梁文谷 / GLM峰 / GLM谷, with a zai-coding-cn validity caveat on the GLM presets.
+- Role rules are now subagent-only: the origin control is removed from the settings card, root requests never match rules, and a persisted legacy rule `origin` is ignored at match time; role panels are collapsible to id + first chain model (or inherit-root).
+- The host model picker labels the virtual row `Auto: <displayName>[<slot>]` (e.g. `Auto: DeepSeek V4 Flash[Liang Peak]`) using the catalog display name, not the model id; the catalog id stays `Auto`.
+- Custom time-slot rows show the host timezone as a read-only label (`Asia/Shanghai (UTC+8)`); there is no timezone picker. Preset-only configs hide the label; mixed configs show Asia/Shanghai. Saving a custom-only config persists the host timezone.
+- Settings card: the card footer is gone — Save/Discard now live beside the 主代理 and 子代理 section headings (and inside the expanded 高级选项 body, where the global Reset also lives), and validation / save errors render under the section that owns them (a store write failure renders under the section whose Save was clicked). Role cards default collapsed (the whole first row is the toggle, with a separate drag handle on time-slot rows so click ≠ drag), and collapsed time-slot rows stay drag-reorderable.
+- Settings card (PR #62 UX round 3): the Reset-to-defaults button and its confirmation dialog are gone from the card (the gateway `fallbacks/reset` RPC and store `resetToDefaults()` stay as host APIs), and each big section (主代理 / 子代理 / 高级选项) now saves ONLY its own fields — 主代理 persists `rootChain` / `timeSlots` / `tz` (+ the card-level `enabled`), 子代理 persists `roles`, 高级选项 persists the advanced scalars — with every other section's value taken from the last accepted config, so one section's Save never rides along (or clobbers) another section's unsaved edits; validation and Discard are per-section too, and after a save only clean sections re-seed from the accepted config.
+
+### Added
+
+- A virtual `FallbacksChain` provider with a single `Auto` row appears in the model picker whenever fallbacks is enabled (no conformance requirement for the row itself); selecting it uses the configured chain as the root primary — a conforming all-day head (exactly one official V4 model) is still required for the override/delegate to succeed — while selecting a real model keeps fallback-only behavior.
+- Time-slot rows (`fallbacks.timeSlots`) rotate the effective root chain by wall-clock windows: four frozen UTC+8 presets (Liang Peak / Liang Valley / GLM Peak / GLM Valley; windows are code constants, models-only edits) or custom `start`/`end`/`days` windows; the first matching row wins and the all-day row is always last. The all-day `rootChain` head must be exactly one official V4 model (`deepseek-official/deepseek-v4-flash` or `deepseek-official/deepseek-v4-pro`; trailing entries allowed) — enforced by the settings card and the gateway on save (a legacy multi-model chain warns at startup, keeps the fallback-only walk, and cannot be saved as-is). Slot changes apply on the next root request and are logged as time-slot switches (分时切换 / time-slot switch) — a routing seed exempt from cooldown and switch caps — never as fallback switches (降级切换 / fallback switch).
+- Settings card: preset peak time-slot rows (Liang Peak / GLM Peak) now carry compact cost tags in their collapsed title — a red 高消耗 / High Cost chip plus a yellow x2 (Liang Peak) or x3 (GLM Peak) multiplier chip (valley and custom rows render none) — and the currently-active slot row (resolved with the runtime's `resolveSlotState`, the P5 single source) shows an 激活 / Active chip; when the active surface is the all-day chain no row is tagged. The chips were restyled as semi-transparent outlined pills hugging the slot name (the first-model meta is right-aligned), and the GLM presets (GLM Peak / GLM Valley) are unselectable in the preset picker until zai-coding-cn is configured (the options stay visible with a 需配置 zai-coding-cn / requires zai-coding-cn suffix, and the add action refuses a GLM preset defensively).
+
+### Fixed
+
+- Clicking "Restore default persona" on a seeded role now resets the in-card draft even when the saved value is already the seed default (issue #59).
+- Time-slot panels in the settings card stay collapsed by default: they no longer re-expand after a save (role cards already behaved this way; a freshly added row still opens for editing).
+- Release prep no longer calls `gh pr reopen` on a closed release PR; it updates an open PR or creates a new one instead.
+
+## [0.2.2] - 2026-08-17
+
+### Fixed
+
+- dsh 0.1.0-rc.7 loads the plugin again: the Fallbacks card registers into the keyed `settings.plugin.item` slot with `key: 'fallbacks'` (the old list-slot `id`/`order` options are gone).
+- Every `@deepseek-ai/dsh-*` peer dependency is floored to `^0.1.0-rc.7` (`cordis` / `schemastery` / `react` unchanged).
+- Sessions containing `fallbacks/switch` events no longer refuse to load: the plugin stops writing durable switch events, and `scripts/repair-fallbacks-switch-logs.ts` marks legacy events ignorable so affected sessions load again.
+- The ineffective apply()-time event-type registration stopgap is removed.
+
+### Added
+
+- Dispatch-time role resolution: on a subagent's first request its role is now resolved in three stages — explicit (`agentPreset` matches a declared role id) → deterministic rules (unchanged) → LLM auto-match from the declared role taxonomy (`fallbacks.roleAutoMatch`, default `true`). Setting `roleAutoMatch: false` disables only the LLM auto-match stage; it reproduces the previous rules-only behavior when there is no explicit role (the explicit `agentPreset` stage is independent new behavior, not gated by the toggle).
+- The resolved role's chain-head model is injected into the subagent's first request and recorded via an explicit `role → model` log line (no durable `fallbacks/switch` event is written — issue #52 stop-write; the `role-inject` reason survives only in the event vocabulary for legacy events).
+
+### Changed
+
+- The web settings card's root-chain section makes explicit that the root chain engages **only after the current session's selected model fails** — it never preempts the session model — and shows a prefer-session-model hint only when the plugin is enabled and a root chain is configured.
+- The card's read-only status block is trimmed to the **recent switch** only: the "current effective model" line and the `selectionNote` degradation line were removed from the card (the documented model-selection degradation is re-homed to `docs/verification.md` §4.7).
+- The settings card now always renders an **Enable role auto-match** switch for `fallbacks.roleAutoMatch` (default `true`), reading and writing the existing config key — the schema default applies even to legacy configs that never declared the key, so the toggle always shows (default on) and a legacy config's first save persists `roleAutoMatch: true`.
+- The conversation `fallbacks-switch` node now shows an explicit **role badge + `role → model`**, and `role-inject` switches display a localized reason rather than the raw string.
+
+## [0.2.1] - 2026-08-16
+
+### Fixed
+
+- Sessions containing `fallbacks/switch` events no longer refuse to load after a dsh restart: the plugin registers its session event type at startup (a stopgap until the upstream registration surface lands; tracked in the .mstar plans).
+- When registration is unavailable, the switch still applies but the durable event is skipped — a session log is never written with an unregistered event type.
+
+## [0.2.0] - 2026-08-16
+
+### Added
+
+- dsh-tui profile support: the plugin now has a first-class client surface in the terminal TUI — `/fallbacks` and the new read-only `/fallbacks config` subcommand appear in the TUI `/` menu with localized descriptions and `config` completion (via the `tuiCommandTrees` service; zero dsh-TUI changes).
+- `/fallbacks config` read-only subcommand: prints the composed configuration summary (enabled / trigger codes / root chain / roles / cooldown / revert / caps / presets) with file-edit hints — the TUI settings readback (the TUI has no settings page; configuration stays file-based).
+
+### Changed
+
+- Split the README compatibility badge into two: `dsh web` and `dsh tui` (simplified text).
+- Refactor README: unified client-agnostic install (copyable `--profile web|dsh-tui` lines), condensed Quick start / Features / Mount-only; details moved to `docs/` (install variants, TUI profile, consumer API); condensed Preset roles section retained (7 bundled roles + `presets` switch).
+
+### Fixed
+
+- `/fallbacks` command registration no longer uses an empty `input.hint` — the real dsh-commands registry rejects empty hints, so the command silently never appeared in any profile; it now registers in both web and dsh-tui profiles.
+
+## [0.1.7] - 2026-08-16
+
+### Changed
+
+- Settings card: seeded role ids are now immutable — the id input of any seed/preset role row is disabled; non-seeded rows keep editable ids.
+
+## [0.1.6] - 2026-08-15
+
+### Added
+
+- Preset roles: bundle 7 omp-style generic subagent roles (designer, librarian, reviewer, scout, security-reviewer, sonic, task) declared automatically on apply via the role-seeds surface (config `presets: 'bundled' | 'none'`, default `bundled`); `presetRoles` exported from the package root.
+
+## [0.1.5] - 2026-08-15
+
+### Added
+
+- Role seeds: the `llm-fallbacks` service grows three additive methods — `declareSeeds` (a, declare `[{ id, persona }]`), `getEffectiveRoles` (b, read back effective roles with seeded / persona-overridden state), and `revertSeededPersona` (c, revert one id to its currently declared seed default) — the service shape grows from six to nine keys, strictly additively.
+- Role seeds: the `fallbacks/get` gateway response (and the post-write `set` / `reset` responses) gains an additive `seeds` badge field, and a new `fallbacks/revert-seed` gateway endpoint reverts one seeded role to its seed default.
+- Settings card: seeded roles show a seed-default / override badge with a revert button, and saving a seeded role with an empty chain is allowed (seeds never write chains).
+
+## [0.1.4] - 2026-08-15
+
+### Added
+
+- Add the dshfind plugin-directory badge to the README (English and Chinese).
+
+### Fixed
+
+- Fixed the Fallbacks settings card occasionally showing stale configuration after Save when a settings refresh overlapped the write.
+
+### Changed
+
+- README release status now reflects the current package version (0.1.3).
+- Settings card: role persona is now a multiline text field.
+- Settings card: role model chains no longer offer a provider wildcard (`provider/*`) — existing wildcard entries read back with a conversion hint and become exact entries when a model is picked.
+- Settings card: the Advanced options section is collapsible and starts collapsed.
+
+## [0.1.3] - 2026-08-15
+
+### Fixed
+
+- Fixed the web settings card failing to load with "client-modules: require(&quot;@deepseek-ai/schemastery&quot;) missed the module table": the `Config` schema moved to a host-only module (`src/schema.ts`) and the client bundle no longer externalizes `@deepseek-ai/schemastery` — the client graph now reaches it type-only, and the bundle purity gate guards the split.
+
+### Changed
+
+- Role entities now carry only an `id` plus a `persona` (personality hint): the `label` field is removed and `description` is renamed to `persona`. Existing `label` / `description` keys are flagged as legacy (`legacyKeys` + startup warning) and stay inert until manually removed (migration rows in `docs/configuration.md`).
+- The settings card reorders its form: the root agent fallback chain, role entities, and role rules come first, with trigger failure codes, cooldown and switch-limit options grouped under an "Advanced options" heading at the end.
+- The root agent's chain editor no longer offers `provider/*` wildcard entries — the root chain stays provider/model lines and provider-any matching lives in the role rules (role chain editors keep the wildcard, and existing YAML `provider/*` entries remain valid).
+
+## [0.1.2] - 2026-08-15
+
+## [0.1.0-alpha.4] - 2026-08-14
+
+### Changed
+
+- npm publishing is now pure OIDC (Trusted Publishing): the bootstrap `NODE_AUTH_TOKEN` mode and the optional secret env were removed after the npm-side trusted publisher was configured; `npm publish --provenance` authenticates entirely via the GitHub OIDC id-token.
+
+## [0.1.0-alpha.3] - 2026-08-14
+
+### Fixed
+
+- Published package now ships `schemastery` as a runtime dependency: the shipped `dist/*.d.ts` type declarations reference it, and consumers without `skipLibCheck` could not resolve the package types (devDependencies are not installed for consumers). Type resolution verified against a fresh consumer install.
+
+## [0.1.0-alpha.2] - 2026-08-14
+
+### Changed
+
+- In-conversation fallback switch notice now reads 模型已降级 / Model downgraded with a warn-tone title (was neutral 模型切换 / Model switch).
+- Declared roles must configure a model chain: the settings card blocks saving a chain-less role (inline hint + banner), and host config validation warns on a missing/empty role chain (never crashes; runtime fallback to `rootChain` preserved).
+
+### Added
+
+- PR-driven npm release pipeline: GitHub Actions `release-prep` (changelog fragments → `release vX.Y.Z` PR) + `release` (Trusted Publishing publish with provenance, tag, GitHub Release), zero long-term secrets.
+- Consumer surface: full runtime library API re-exported from the package root (`resolveRole` / `resolveChain` / `validateFallbacksConfig` / `detectLegacyKeys` / types) plus a named cordis service `llm-fallbacks` (`ctx.get('llm-fallbacks')` capability probe).
+- GitHub Actions CI verify pipeline (tests + full build) on PRs and `main` pushes.
+- Changelog fragment mechanism (`.changes/unreleased/`) with English `CHANGELOG.md`.
+
+## [0.1.0-alpha.1] - 2026-08-13
+
+### Added
+
+- Initial plugin release: automatic provider/model fallback chains (cooldown, role-based resolution) wired into the dsh host via cordis, a web settings page, and dsh role patches that auto-apply on plugin install.
+- Two-block configuration model: `rootChain` plus role entities, with migration from the legacy single-chain shape and save-time validation.
+
+### Changed
+
+- Feedback round: role-requires-model-config save guard, downgrade-clear switch copy, and diagnostics/reporting improvements.
+
+### CI / Ops
+
+- GitHub Actions verify pipeline (tests + build) on the pnpm-native toolchain.
