@@ -7,6 +7,7 @@ Plugins (bundles) for [DSH](https://www.npmjs.com/package/@deepseek-ai/dsh), the
 | [hindsight-memory](hindsight-memory/) | Long-term memory backed by a [Hindsight](https://github.com/vectorize-io/hindsight) server: recall, retain, and reflect tools plus automatic retention of completed turns. |
 | [auto-effort](auto-effort/) | Automatic reasoning-effort selection: a small evaluator model picks one of the current model's real thinking levels per prompt when Effort is on Default; includes a CLIProxyAPI level sync script. |
 | [llm-fallbacks-custom](llm-fallbacks-custom/) | Custom fallback-chain plugin for DSH `0.2.1-rc.2`, adapted from upstream for quota and rate-limit failover. Install from its local directory; not published on npm. |
+| [whisper-dictation](whisper-dictation/) | OpenWhispr-style dictation behind the Voice Input microphone: local Whisper (choose the size), AI transcript cleanup with OpenWhispr's prompt, custom dictionary, replacement rules and snippets. Requires the Voice Input bundle. |
 | [searxng-search](searxng-search/) | `web_search` backed by a self-hosted [SearXNG](https://docs.searxng.org/) instance (JSON API) instead of the DeepSeek search API. |
 | [no-token](no-token/) | Opening DSH web no longer needs the launch token: browsers on trusted hosts get the session cookie automatically. Only use it when something else controls access to the port. |
 

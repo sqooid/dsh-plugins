@@ -1,0 +1,17 @@
+# Requires the Voice Input bundle (@deepseek-ai/dsh-experimental-voice-input-bundle),
+# which provides the speech service, its Web Remote and the microphone button.
+- insert:
+    - id: whisper-dictation
+      name: '@local/dsh-whisper-dictation'
+      config:
+        dataRoot: !!js dshHomePath('speech-to-text', 'whisper')
+        # One recognition provider per size; pick one under Plugins → Voice Input.
+        models: [base.en, small.en, medium.en, turbo]
+        threads: 4
+        # Live settings (Plugins → Dictation):
+        cleanup: true
+        cleanupProvider: cpa
+        cleanupModel: claude-haiku-5-5
+        dictionary: []
+        replacements: []
+        snippets: []

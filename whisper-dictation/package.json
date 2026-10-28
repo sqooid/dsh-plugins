@@ -1,0 +1,31 @@
+{
+  "name": "@local/dsh-whisper-dictation",
+  "version": "0.1.0",
+  "private": true,
+  "description": "OpenWhispr-style dictation for DSH: local Whisper (choose the model size) with AI transcript cleanup, a custom dictionary, replacement rules and snippets, behind DSH's Voice Input microphone.",
+  "type": "module",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./package.json": "./package.json"
+  },
+  "files": ["index.js", "client.js", "worker.js", "lib/*.js", "models.json", "cordis.patch.yml", "scripts/*.mjs", "README.md"],
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/schemastery": "~3.18.5-alpha.2"
+  },
+  "dsh": {
+    "bundle": { "patch": "./cordis.patch.yml" },
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-settings",
+        "@deepseek-ai/dsh-client-ui-plugin-manager",
+        "@deepseek-ai/dsh-api-remotes"
+      ],
+      "platform": "web"
+    }
+  }
+}
