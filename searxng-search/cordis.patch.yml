@@ -1,0 +1,18 @@
+- insert:
+    - id: searxng-search
+      name: '@local/dsh-searxng-search'
+      config:
+        # SearXNG base URL; empty falls back to $SEARXNG_ENDPOINT.
+        endpoint: http://127.0.0.1:8080
+        # Optional comma-separated filters; empty = instance defaults.
+        categories: ''
+        engines: ''
+        language: ''
+        timeoutMs: 20000
+# Route web_search to SearXNG. Patches replace config wholesale, so this
+# restates the base bundle's fetch provider.
+- id: web
+  name: '@deepseek-ai/dsh-web'
+  config:
+    searchProvider: searxng
+    fetchProvider: http

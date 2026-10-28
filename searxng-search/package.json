@@ -1,0 +1,19 @@
+{
+  "name": "@local/dsh-searxng-search",
+  "version": "0.1.0",
+  "private": true,
+  "description": "SearXNG search provider for the DSH web capability seam, so web_search queries a self-hosted SearXNG instance.",
+  "type": "module",
+  "exports": {
+    ".": "./index.js",
+    "./package.json": "./package.json"
+  },
+  "files": ["index.js", "cordis.patch.yml", "README.md"],
+  "peerDependencies": {
+    "@deepseek-ai/schemastery": "~3.18.5-alpha.2",
+    "@deepseek-ai/dsh-web": "*"
+  },
+  "dsh": {
+    "bundle": { "patch": "./cordis.patch.yml" }
+  }
+}
